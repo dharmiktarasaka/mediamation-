@@ -1,7 +1,6 @@
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const MOCK_CAPTIONS = {
   professional: `📈 Empowering teams and building future-proof solutions. Success starts with a clear vision and consistent execution. 💼✨\n\n#business #leadership #career #growth #motivation #success #entrepreneurship #professional`,
@@ -15,7 +14,6 @@ const MOCK_CAPTIONS = {
 
 export async function generateAICaption(filename, mimetype, tone = 'attractive') {
   const groqApiKey = process.env.GROQ_API_KEY;
-  const geminiApiKey = process.env.GEMINI_API_KEY;
   const mockCaption = MOCK_CAPTIONS[tone.toLowerCase()] || MOCK_CAPTIONS.attractive;
 
   const prompt = `Analyze this image and write a highly engaging, trending social media caption suitable for Instagram and Facebook.
@@ -26,11 +24,8 @@ The caption should:
 4. Keep the caption concise yet compelling.
 Return ONLY the final caption text, ready to be copied. Do not add any conversational intro or markdown wrapper like 'Here is a caption'.`;
 
-  // If neither key is configured
-  if (
-    (!groqApiKey || groqApiKey.trim() === '' || groqApiKey === 'YOUR_GROQ_API_KEY') &&
-    (!geminiApiKey || geminiApiKey === 'YOUR_GEMINI_API_KEY' || geminiApiKey.trim() === '')
-  ) {
+  // If Groq key is missing or not configured
+  if (!groqApiKey || groqApiKey.trim() === '' || groqApiKey === 'YOUR_GROQ_API_KEY') {
     return {
       caption: mockCaption,
       isMock: true,
@@ -51,87 +46,50 @@ Return ONLY the final caption text, ready to be copied. Do not add any conversat
   try {
     const base64Data = Buffer.from(fs.readFileSync(filePath)).toString('base64');
 
-    // 1. Try Groq (Llama 3.2 11B Vision) if key is provided
-    if (groqApiKey && groqApiKey.trim() !== '' && groqApiKey !== 'YOUR_GROQ_API_KEY') {
-      try {
-        console.log('[AI Caption] Generating using Groq Llama-3.2-11b-vision-preview...');
-        const response = await axios.post(
-          'https://api.groq.com/openai/v1/chat/completions',
+    console.log('[AI Caption] Generating using Groq Llama-3.2-11b-vision-preview...');
+    const response = await axios.post(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        model: 'llama-3.2-11b-vision-preview',
+        messages: [
           {
-            model: 'llama-3.2-11b-vision-preview',
-            messages: [
+            role: 'user',
+            content: [
+              { type: 'text', text: prompt },
               {
-                role: 'user',
-                content: [
-                  { type: 'text', text: prompt },
-                  {
-                    type: 'image_url',
-                    image_url: {
-                      url: `data:${mimetype};base64,${base64Data}`
-                    }
-                  }
-                ]
+                type: 'image_url',
+                image_url: {
+                  url: `data:${mimetype};base64,${base64Data}`
+                }
               }
-            ],
-            temperature: 0.7,
-            max_tokens: 512
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${groqApiKey}`,
-              'Content-Type': 'application/json'
-            }
+            ]
           }
-        );
-
-        const captionText = response.data?.choices?.[0]?.message?.content;
-        if (captionText) {
-          console.log('[AI Caption] Groq generated successfully!');
-          return {
-            caption: captionText.trim(),
-            isMock: false
-          };
-        }
-      } catch (groqError) {
-        console.error('[AI Caption] Groq API execution failed:', groqError.response?.data || groqError.message);
-        // Fall back to Gemini if available, otherwise return error details.
-        if (!geminiApiKey || geminiApiKey === 'YOUR_GEMINI_API_KEY' || geminiApiKey.trim() === '') {
-          throw groqError;
+        ],
+        temperature: 0.7,
+        max_tokens: 512
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${groqApiKey}`,
+          'Content-Type': 'application/json'
         }
       }
-    }
+    );
 
-    // 2. Fallback to Gemini if key is provided
-    if (geminiApiKey && geminiApiKey.trim() !== '' && geminiApiKey !== 'YOUR_GEMINI_API_KEY') {
-      console.log('[AI Caption] Falling back / generating using Gemini-2.5-flash...');
-      const genAI = new GoogleGenerativeAI(geminiApiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
-      const imagePart = {
-        inlineData: {
-          data: base64Data,
-          mimeType: mimetype
-        }
-      };
-
-      const result = await model.generateContent([prompt, imagePart]);
-      const response = await result.response;
+    const captionText = response.data?.choices?.[0]?.message?.content;
+    if (captionText) {
+      console.log('[AI Caption] Groq generated successfully!');
       return {
-        caption: response.text().trim(),
+        caption: captionText.trim(),
         isMock: false
       };
     }
 
-    // This shouldn't normally be reached as keys were checked, but return mock just in case
-    return {
-      caption: mockCaption,
-      isMock: true,
-      reason: 'missing_key'
-    };
+    throw new Error('Empty response from Groq API.');
 
   } catch (error) {
     const errorMsg = error.response?.data?.error?.message || error.message;
-    console.error('[AI Caption] Live API Error, falling back to mock:', errorMsg);
+    console.error('[AI Caption] Groq API Error, falling back to mock:', errorMsg);
     return {
       caption: mockCaption,
       isMock: true,
