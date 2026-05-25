@@ -252,7 +252,7 @@ export default function History() {
               )}
 
               <div className="post-card-actions">
-                {post.status !== 'published' && (
+                {post.status !== 'published' && post.status !== 'publishing' && (
                   <button 
                     className="btn-edit btn-sm"
                     onClick={() => handleOpenEditModal(post)}

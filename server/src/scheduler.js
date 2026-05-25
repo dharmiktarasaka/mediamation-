@@ -9,9 +9,22 @@ export const startScheduler = () => {
     const due = await Post.find({
       status: 'scheduled',
       scheduledAt: { $lte: now },
-    }).populate('account');
+    });
 
-    for (const post of due) {
+    for (const duePost of due) {
+      // Atomically lock the post by changing status to 'publishing'
+      const post = await Post.findOneAndUpdate(
+        { _id: duePost._id, status: 'scheduled' },
+        { status: 'publishing' },
+        { new: true }
+      ).populate('account');
+
+      // If post is null, it means another server instance has already locked it
+      if (!post) {
+        console.log(`[Scheduler] Post ${duePost._id} is already being processed by another server instance. Skipping.`);
+        continue;
+      }
+
       try {
         let result;
         if (post.platform === 'facebook') {
