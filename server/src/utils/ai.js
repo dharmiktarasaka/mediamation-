@@ -74,14 +74,14 @@ Return ONLY the final caption text, ready to be copied. Do not add any conversat
   try {
     const base64Data = Buffer.from(fs.readFileSync(filePath)).toString('base64');
 
-    // 1. Try Groq (Llama 3.2 11B Vision)
+    // 1. Try Groq (Llama-4 Scout Vision)
     if (provider === 'groq') {
       try {
-        console.log('[AI Caption] Generating using Groq Llama-3.2-11b-vision-preview...');
+        console.log('[AI Caption] Generating using Groq Llama-4-scout-17b-16e-instruct...');
         const response = await axios.post(
           'https://api.groq.com/openai/v1/chat/completions',
           {
-            model: 'llama-3.2-11b-vision-preview',
+            model: 'meta-llama/llama-4-scout-17b-16e-instruct',
             messages: [
               {
                 role: 'user',
