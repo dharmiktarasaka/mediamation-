@@ -273,6 +273,10 @@ router.get('/facebook/callback', async (req, res) => {
       },
     });
 
+    console.log('=== FACEBOOK PAGES RESPONSE ===');
+    console.log(JSON.stringify(pagesRes.data, null, 2));
+    console.log('================================');
+
     for (const page of pagesRes.data.data) {
       await Account.findOneAndUpdate(
         { platformUserId: page.id, platform: 'facebook' },
