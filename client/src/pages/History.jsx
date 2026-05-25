@@ -133,7 +133,15 @@ export default function History() {
       setEditContent(res.data.caption);
       if (res.data.isMock) {
         if (res.data.reason === 'api_error') {
-          toast.error(`Gemini API Error: ${res.data.error || 'Unknown error'}. Falling back to simulated caption.`, { duration: 8000 });
+          const isQuota = res.data.error?.toLowerCase().includes('quota') || res.data.error?.includes('429');
+          if (isQuota) {
+            toast.error(
+              'Gemini API Daily Free Quota Exceeded (20 requests/day). Generated a simulated caption for you instead. Try again later or upgrade your key on Google AI Studio.',
+              { duration: 10000 }
+            );
+          } else {
+            toast.error(`Gemini API Error: ${res.data.error || 'Unknown error'}. Falling back to simulated caption.`, { duration: 8000 });
+          }
         } else {
           toast((t) => (
             <span>
