@@ -27,6 +27,8 @@ export default function Dashboard() {
       toast.success('Facebook account connected successfully!');
     } else if (searchParams.get('error') === 'facebook_auth_failed') {
       toast.error('Failed to connect Facebook account.');
+    } else if (searchParams.get('error') === 'no_pages_found') {
+      toast.error('Connected successfully, but no Facebook Pages were found. Make sure you own/manage a Page and selected it during login.');
     } else if (searchParams.get('connected') === 'pinterest') {
       toast.success('Pinterest account connected successfully!');
     } else if (searchParams.get('error') === 'pinterest_auth_failed') {

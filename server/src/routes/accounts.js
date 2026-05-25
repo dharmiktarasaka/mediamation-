@@ -305,6 +305,10 @@ router.get('/facebook/callback', async (req, res) => {
       }
     }
 
+    if (!pagesRes.data.data || pagesRes.data.data.length === 0) {
+      return res.redirect(`${process.env.CLIENT_URL}/dashboard?error=no_pages_found`);
+    }
+
     res.redirect(`${process.env.CLIENT_URL}/dashboard?connected=facebook`);
   } catch (error) {
     console.error('Facebook callback error:', error.response?.data || error.message);
