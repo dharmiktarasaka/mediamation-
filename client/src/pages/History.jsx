@@ -155,9 +155,10 @@ export default function History() {
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     try {
+      const utcScheduledAt = new Date(editScheduledAt).toISOString();
       await postsAPI.update(editingPostId, {
         content: editContent,
-        scheduledAt: editScheduledAt,
+        scheduledAt: utcScheduledAt,
         media: editMedia
       });
       toast.success('Post updated successfully!');

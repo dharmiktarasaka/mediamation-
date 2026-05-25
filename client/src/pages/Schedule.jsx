@@ -136,8 +136,12 @@ export default function Schedule() {
         url: m.url,
         type: m.mimetype.startsWith('video/') ? 'video' : 'image'
       }));
+      
+      const utcScheduledAt = new Date(form.scheduledAt).toISOString();
+      
       await postsAPI.create({
         ...form,
+        scheduledAt: utcScheduledAt,
         media: transformedMedia
       });
       toast.success('Post scheduled!');
