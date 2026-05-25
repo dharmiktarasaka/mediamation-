@@ -6,6 +6,7 @@ import Privacy from './pages/Privacy.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Schedule from './pages/Schedule.jsx';
 import History from './pages/History.jsx';
+import Settings from './pages/Settings.jsx';
 import Layout from './components/Layout.jsx';
 
 function ProtectedRoute({ children }) {
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="schedule" element={<Schedule />} />
         <Route path="history" element={<History />} />
+        <Route path="settings" element={<Settings />} />
       </Route>
     </Routes>
   );

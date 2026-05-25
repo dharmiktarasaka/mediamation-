@@ -6,6 +6,9 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true },
   password: { type: String },
   firebaseUid: { type: String, unique: true, sparse: true },
+  aiProvider: { type: String, enum: ['groq', 'gemini', 'mock'], default: 'mock' },
+  groqApiKey: { type: String, default: '' },
+  geminiApiKey: { type: String, default: '' },
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {

@@ -94,7 +94,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, loginWithGoogle, hasGoogleAuth: !!googleProvider }}>
+    <AuthContext.Provider value={{ user, setUser, loading, login, register, logout, loginWithGoogle, hasGoogleAuth: !!googleProvider }}>
       {children}
     </AuthContext.Provider>
   );

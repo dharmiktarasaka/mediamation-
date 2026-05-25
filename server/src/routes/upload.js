@@ -64,7 +64,7 @@ router.post('/generate-caption', protect, async (req, res) => {
   }
 
   try {
-    const { caption, isMock, reason, error } = await generateAICaption(filename, mimetype, tone);
+    const { caption, isMock, reason, error } = await generateAICaption(filename, mimetype, tone, req.user);
     res.json({ caption, isMock, reason, error });
   } catch (error) {
     console.error('[AI Caption Error]', error.message);

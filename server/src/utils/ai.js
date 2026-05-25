@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import axios from 'axios';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
 const MOCK_CAPTIONS = {
   professional: `📈 Empowering teams and building future-proof solutions. Success starts with a clear vision and consistent execution. 💼✨\n\n#business #leadership #career #growth #motivation #success #entrepreneurship #professional`,
@@ -12,9 +13,36 @@ const MOCK_CAPTIONS = {
   marketing: `🎯 Want to scale your brand? Here are 3 simple tips to get started today: define your audience, write compelling hooks, and test consistently. Save this post for later! 📈💡\n\n#marketingtips #growthhacking #branding #digitalmarketing #socialmediamarketing #businesstips #strategy`
 };
 
-export async function generateAICaption(filename, mimetype, tone = 'attractive') {
-  const groqApiKey = process.env.GROQ_API_KEY;
+export async function generateAICaption(filename, mimetype, tone = 'attractive', user = null) {
   const mockCaption = MOCK_CAPTIONS[tone.toLowerCase()] || MOCK_CAPTIONS.attractive;
+
+  // Determine api keys (defaults from .env, overridden by user settings if present)
+  let groqApiKey = process.env.GROQ_API_KEY;
+  let geminiApiKey = process.env.GEMINI_API_KEY;
+
+  if (user) {
+    if (user.groqApiKey && user.groqApiKey.trim() !== '') {
+      groqApiKey = user.groqApiKey;
+    }
+    if (user.geminiApiKey && user.geminiApiKey.trim() !== '') {
+      geminiApiKey = user.geminiApiKey;
+    }
+  }
+
+  // Determine provider:
+  // If user selected a provider explicitly, use it.
+  // Otherwise, default to groq if GROQ_API_KEY is set, then gemini, then mock.
+  let provider = 'mock';
+  if (user && user.aiProvider && user.aiProvider !== 'mock') {
+    provider = user.aiProvider;
+  } else {
+    // System fallback
+    if (groqApiKey && groqApiKey !== 'YOUR_GROQ_API_KEY' && groqApiKey.trim() !== '') {
+      provider = 'groq';
+    } else if (geminiApiKey && geminiApiKey !== 'YOUR_GEMINI_API_KEY' && geminiApiKey.trim() !== '') {
+      provider = 'gemini';
+    }
+  }
 
   const prompt = `Analyze this image and write a highly engaging, trending social media caption suitable for Instagram and Facebook.
 The caption should:
@@ -24,8 +52,8 @@ The caption should:
 4. Keep the caption concise yet compelling.
 Return ONLY the final caption text, ready to be copied. Do not add any conversational intro or markdown wrapper like 'Here is a caption'.`;
 
-  // If Groq key is missing or not configured
-  if (!groqApiKey || groqApiKey.trim() === '' || groqApiKey === 'YOUR_GROQ_API_KEY') {
+  // If mock provider is chosen or no keys are configured
+  if (provider === 'mock') {
     return {
       caption: mockCaption,
       isMock: true,
@@ -46,50 +74,84 @@ Return ONLY the final caption text, ready to be copied. Do not add any conversat
   try {
     const base64Data = Buffer.from(fs.readFileSync(filePath)).toString('base64');
 
-    console.log('[AI Caption] Generating using Groq Llama-3.2-11b-vision-preview...');
-    const response = await axios.post(
-      'https://api.groq.com/openai/v1/chat/completions',
-      {
-        model: 'llama-3.2-11b-vision-preview',
-        messages: [
+    // 1. Try Groq (Llama 3.2 11B Vision)
+    if (provider === 'groq') {
+      try {
+        console.log('[AI Caption] Generating using Groq Llama-3.2-11b-vision-preview...');
+        const response = await axios.post(
+          'https://api.groq.com/openai/v1/chat/completions',
           {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
+            model: 'llama-3.2-11b-vision-preview',
+            messages: [
               {
-                type: 'image_url',
-                image_url: {
-                  url: `data:${mimetype};base64,${base64Data}`
-                }
+                role: 'user',
+                content: [
+                  { type: 'text', text: prompt },
+                  {
+                    type: 'image_url',
+                    image_url: {
+                      url: `data:${mimetype};base64,${base64Data}`
+                    }
+                  }
+                ]
               }
-            ]
+            ],
+            temperature: 0.7,
+            max_tokens: 512
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${groqApiKey}`,
+              'Content-Type': 'application/json'
+            }
           }
-        ],
-        temperature: 0.7,
-        max_tokens: 512
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${groqApiKey}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+        );
 
-    const captionText = response.data?.choices?.[0]?.message?.content;
-    if (captionText) {
-      console.log('[AI Caption] Groq generated successfully!');
+        const captionText = response.data?.choices?.[0]?.message?.content;
+        if (captionText) {
+          console.log('[AI Caption] Groq generated successfully!');
+          return {
+            caption: captionText.trim(),
+            isMock: false
+          };
+        }
+      } catch (groqError) {
+        const groqErrMsg = groqError.response?.data?.error?.message || groqError.message;
+        console.error('[AI Caption] Groq API execution failed:', groqErrMsg);
+        throw new Error(`Groq API Error: ${groqErrMsg}`);
+      }
+    }
+
+    // 2. Try Gemini (Gemini 2.5 Flash)
+    if (provider === 'gemini') {
+      console.log('[AI Caption] Generating using Gemini-2.5-flash...');
+      const genAI = new GoogleGenerativeAI(geminiApiKey);
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+
+      const imagePart = {
+        inlineData: {
+          data: base64Data,
+          mimeType: mimetype
+        }
+      };
+
+      const result = await model.generateContent([prompt, imagePart]);
+      const response = await result.response;
       return {
-        caption: captionText.trim(),
+        caption: response.text().trim(),
         isMock: false
       };
     }
 
-    throw new Error('Empty response from Groq API.');
+    return {
+      caption: mockCaption,
+      isMock: true,
+      reason: 'missing_key'
+    };
 
   } catch (error) {
     const errorMsg = error.response?.data?.error?.message || error.message;
-    console.error('[AI Caption] Groq API Error, falling back to mock:', errorMsg);
+    console.error('[AI Caption] Live API Error, falling back to mock:', errorMsg);
     return {
       caption: mockCaption,
       isMock: true,

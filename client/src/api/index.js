@@ -30,6 +30,7 @@ export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   login: (data) => api.post('/auth/login', data),
   me: () => api.get('/auth/me'),
+  updateSettings: (data) => api.put('/auth/settings', data),
 };
 
 export const accountsAPI = {

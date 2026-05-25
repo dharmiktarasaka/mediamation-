@@ -59,6 +59,23 @@ router.get('/me', protect, (req, res) => {
   res.json(req.user);
 });
 
+router.put('/settings', protect, async (req, res) => {
+  try {
+    const { aiProvider, groqApiKey, geminiApiKey } = req.body;
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    if (aiProvider !== undefined) user.aiProvider = aiProvider;
+    if (groqApiKey !== undefined) user.groqApiKey = groqApiKey;
+    if (geminiApiKey !== undefined) user.geminiApiKey = geminiApiKey;
+
+    await user.save();
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 router.get('/instagram/callback', async (req, res) => {
   const { code, state } = req.query;
   if (!code) {
