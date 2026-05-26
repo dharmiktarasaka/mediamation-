@@ -6,10 +6,11 @@ import path from 'path';
 import { generateAICaption } from '../utils/ai.js';
 
 const router = express.Router();
-
-const fileUrl = (req, filename) =>
-  `${req.protocol}://${req.get('host')}/uploads/${filename}`;
-
+const fileUrl = (req, filename) => {
+  const host = req.get('host');
+  const protocol = (host.includes('localhost') || host.includes('127.0.0.1')) ? 'http' : 'https';
+  return `${protocol}://${host}/uploads/${filename}`;
+};
 // Handle single file upload
 router.post('/', protect, upload.single('media'), (req, res) => {
   try {
