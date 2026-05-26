@@ -25,6 +25,14 @@ export const startScheduler = () => {
         continue;
       }
 
+      if (!post.account) {
+        post.status = 'failed';
+        post.error = 'The associated social media account was disconnected or not found.';
+        await post.save();
+        console.warn(`[Scheduler] Post ${post._id} failed: Account not found.`);
+        continue;
+      }
+
       try {
         let result;
         if (post.platform === 'facebook') {
