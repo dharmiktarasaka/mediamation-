@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const postSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   account: { type: mongoose.Schema.Types.ObjectId, ref: 'Account', required: true },
-  platform: { type: String, enum: ['instagram', 'facebook', 'pinterest', 'twitter'], required: true },
+  platform: { type: String, enum: ['instagram', 'facebook', 'pinterest', 'twitter', 'tumblr'], required: true },
   content: { type: String, required: true },
   media: [{
     url: { type: String, required: true },

@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import axios from 'axios';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import { protect } from '../middleware/auth.js';
 import Account from '../models/Account.js';
 import { IgApiClient, IgCheckpointError } from 'instagram-private-api';
+import { buildAuthorizationHeader } from '../utils/oauth1.js';
 
 const router = Router();
 const TWITTER_OAUTH_VERIFIER = 'twitter_oauth_verifier_key_mediamation_static_v2';
@@ -496,6 +498,165 @@ router.get('/twitter/callback', async (req, res) => {
   } catch (error) {
     console.error('Twitter callback error:', error.response?.data || error.message);
     res.redirect(`${clientUrl}/dashboard?error=twitter_auth_failed`);
+  }
+});
+
+// Tumblr Temporary Secret Model (for OAuth 1.0a handshake)
+const TumblrTempSchema = new mongoose.Schema({
+  oauthToken: { type: String, required: true, unique: true },
+  oauthTokenSecret: { type: String, required: true },
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+}, { timestamps: true });
+
+// Auto-delete after 15 minutes to save space
+TumblrTempSchema.index({ createdAt: 1 }, { expireAfterSeconds: 900 });
+
+// Avoid compiling the model multiple times in development watch mode
+const TumblrTemp = mongoose.models.TumblrTemp || mongoose.model('TumblrTemp', TumblrTempSchema);
+
+// Tumblr OAuth 1.0a Initiate
+router.get('/tumblr', protect, async (req, res) => {
+  try {
+    const host = req.get('host');
+    const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+    const callbackUrl = isLocal
+      ? 'http://localhost:5000/api/accounts/tumblr/callback'
+      : 'https://mediamation.onrender.com/api/accounts/tumblr/callback';
+
+    const url = 'https://www.tumblr.com/oauth/request_token';
+    const authHeader = buildAuthorizationHeader(
+      'POST',
+      url,
+      { oauth_callback: callbackUrl },
+      process.env.TUMBLR_CONSUMER_KEY,
+      process.env.TUMBLR_CONSUMER_SECRET
+    );
+
+    const resToken = await axios.post(url, new URLSearchParams({ oauth_callback: callbackUrl }), {
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      }
+    });
+
+    const params = new URLSearchParams(resToken.data);
+    const oauthToken = params.get('oauth_token');
+    const oauthTokenSecret = params.get('oauth_token_secret');
+
+    if (!oauthToken || !oauthTokenSecret) {
+      console.error('Tumblr Request Token missing in response:', resToken.data);
+      return res.status(400).json({ message: 'Failed to request token from Tumblr' });
+    }
+
+    // Save temporary secret to associate with oauthToken in callback
+    await TumblrTemp.create({
+      oauthToken,
+      oauthTokenSecret,
+      user: req.user._id,
+    });
+
+    const redirectUrl = `https://www.tumblr.com/oauth/authorize?oauth_token=${oauthToken}`;
+    res.json({ url: redirectUrl });
+  } catch (error) {
+    console.error('Tumblr auth initiate error:', error.response?.data || error.message);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Tumblr OAuth 1.0a Callback
+router.get('/tumblr/callback', async (req, res) => {
+  const { oauth_token, oauth_verifier } = req.query;
+
+  if (!oauth_token || !oauth_verifier) {
+    console.error('Missing parameters in Tumblr callback:', req.query);
+    return res.redirect(`${clientUrl}/dashboard?error=tumblr_auth_failed`);
+  }
+
+  try {
+    // Retrieve the temporary secret and user ID
+    const tempRecord = await TumblrTemp.findOne({ oauthToken: oauth_token });
+    if (!tempRecord) {
+      console.error('No temp record found for oauth_token:', oauth_token);
+      return res.redirect(`${clientUrl}/dashboard?error=tumblr_auth_failed`);
+    }
+
+    const { oauthTokenSecret: tempSecret, user: userId } = tempRecord;
+
+    const url = 'https://www.tumblr.com/oauth/access_token';
+    const authHeader = buildAuthorizationHeader(
+      'POST',
+      url,
+      { oauth_verifier },
+      process.env.TUMBLR_CONSUMER_KEY,
+      process.env.TUMBLR_CONSUMER_SECRET,
+      oauth_token,
+      tempSecret
+    );
+
+    const resToken = await axios.post(url, new URLSearchParams({ oauth_verifier }), {
+      headers: {
+        'Authorization': authHeader,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      }
+    });
+
+    const params = new URLSearchParams(resToken.data);
+    const accessToken = params.get('oauth_token');
+    const tokenSecret = params.get('oauth_token_secret');
+
+    if (!accessToken || !tokenSecret) {
+      console.error('Missing tokens in Tumblr access token exchange:', resToken.data);
+      return res.redirect(`${clientUrl}/dashboard?error=tumblr_auth_failed`);
+    }
+
+    // Fetch user info to save blog(s)
+    const userInfoUrl = 'https://api.tumblr.com/v2/user/info';
+    const infoAuthHeader = buildAuthorizationHeader(
+      'GET',
+      userInfoUrl,
+      {},
+      process.env.TUMBLR_CONSUMER_KEY,
+      process.env.TUMBLR_CONSUMER_SECRET,
+      accessToken,
+      tokenSecret
+    );
+
+    const infoRes = await axios.get(userInfoUrl, {
+      headers: {
+        'Authorization': infoAuthHeader,
+      }
+    });
+
+    const user = infoRes.data.response.user;
+    if (!user || !user.blogs || user.blogs.length === 0) {
+      console.error('No blogs found in Tumblr user info:', infoRes.data);
+      return res.redirect(`${clientUrl}/dashboard?error=no_blogs_found`);
+    }
+
+    for (const blog of user.blogs) {
+      await Account.findOneAndUpdate(
+        { platformUserId: blog.name, platform: 'tumblr' },
+        {
+          user: userId,
+          platform: 'tumblr',
+          platformUserId: blog.name,
+          name: blog.title || blog.name,
+          avatar: `https://api.tumblr.com/v2/blog/${blog.name}.tumblr.com/avatar/64`,
+          accessToken: accessToken,
+          tokenSecret: tokenSecret,
+          pageId: blog.name,
+        },
+        { upsert: true, new: true }
+      );
+    }
+
+    // Clean up temporary record
+    await TumblrTemp.deleteOne({ _id: tempRecord._id });
+
+    res.redirect(`${clientUrl}/dashboard?connected=tumblr`);
+  } catch (error) {
+    console.error('Tumblr callback error:', error.response?.data || error.message);
+    res.redirect(`${clientUrl}/dashboard?error=tumblr_auth_failed`);
   }
 });
 

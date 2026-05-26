@@ -22,7 +22,6 @@ export default function Dashboard() {
   useEffect(() => {
     accountsAPI.list().then((res) => setAccounts(res.data));
     postsAPI.list({ status: 'scheduled' }).then((res) => setPosts(res.data));
-
     if (searchParams.get('connected') === 'facebook') {
       toast.success('Facebook account connected successfully!');
     } else if (searchParams.get('error') === 'facebook_auth_failed') {
@@ -37,6 +36,10 @@ export default function Dashboard() {
       toast.success('Twitter (X) account connected successfully!');
     } else if (searchParams.get('error') === 'twitter_auth_failed') {
       toast.error('Failed to connect Twitter (X) account.');
+    } else if (searchParams.get('connected') === 'tumblr') {
+      toast.success('Tumblr account connected successfully!');
+    } else if (searchParams.get('error') === 'tumblr_auth_failed') {
+      toast.error('Failed to connect Tumblr account.');
     }
   }, [searchParams]);
 
@@ -67,6 +70,14 @@ export default function Dashboard() {
     }
   };
 
+  const handleConnectTumblr = async () => {
+    try {
+      const res = await accountsAPI.tumblrAuth();
+      window.location.href = res.data.url;
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to start Tumblr authentication.');
+    }
+  };
   const handleConnectInstagram = () => {
     setShowInstaModal(true);
     setInstaStep(1);
@@ -202,6 +213,13 @@ export default function Dashboard() {
               onClick={handleConnectTwitter}
             >
               + Connect Twitter
+            </button>
+            <button 
+              className="btn-primary" 
+              style={{ background: '#35465c' }} 
+              onClick={handleConnectTumblr}
+            >
+              + Connect Tumblr
             </button>
           </div>
 

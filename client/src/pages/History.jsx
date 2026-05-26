@@ -199,13 +199,15 @@ export default function History() {
               <option value="failed">Failed</option>
             </select>
           </div>
-
           <div className="filter-group">
             <label>Platform</label>
             <select value={platformFilter} onChange={(e) => setPlatformFilter(e.target.value)}>
               <option value="all">All Platforms</option>
               <option value="facebook">Facebook</option>
               <option value="instagram">Instagram</option>
+              <option value="pinterest">Pinterest</option>
+              <option value="twitter">Twitter (X)</option>
+              <option value="tumblr">Tumblr</option>
             </select>
           </div>
         </div>

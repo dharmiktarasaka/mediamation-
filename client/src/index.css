@@ -582,6 +582,11 @@ button:disabled, .btn-primary:disabled {
   color: white;
 }
 
+.platform-badge.tumblr {
+  background: #35465c;
+  color: white;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;

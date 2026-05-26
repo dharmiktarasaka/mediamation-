@@ -32,7 +32,6 @@ export const authAPI = {
   me: () => api.get('/auth/me'),
   updateSettings: (data) => api.put('/auth/settings', data),
 };
-
 export const accountsAPI = {
   list: () => api.get('/accounts'),
   disconnect: (id) => api.delete(`/accounts/${id}`),
@@ -40,10 +39,10 @@ export const accountsAPI = {
   instagramAuth: () => api.get('/accounts/instagram'),
   pinterestAuth: () => api.get('/accounts/pinterest'),
   twitterAuth: () => api.get('/accounts/twitter'),
+  tumblrAuth: () => api.get('/accounts/tumblr'),
   connectFacebook: (data) => api.post('/accounts/connect-facebook', data),
   connectInstagramPrivate: (data) => api.post('/accounts/connect-instagram-private', data),
 };
-
 export const postsAPI = {
   list: (params) => api.get('/posts', { params }),
   create: (data) => api.post('/posts', data),

@@ -1,7 +1,13 @@
 import cron from 'node-cron';
 import Post from './models/Post.js';
 import Account from './models/Account.js';
-import { publishToFacebook, publishToInstagram, publishToPinterest, publishToTwitter } from './publisher.js';
+import { 
+  publishToFacebook, 
+  publishToInstagram, 
+  publishToPinterest, 
+  publishToTwitter, 
+  publishToTumblr 
+} from './publisher.js';
 
 export const startScheduler = () => {
   cron.schedule('* * * * *', async () => {
@@ -43,11 +49,13 @@ export const startScheduler = () => {
           result = await publishToPinterest(post, post.account);
         } else if (post.platform === 'twitter') {
           result = await publishToTwitter(post, post.account);
+        } else if (post.platform === 'tumblr') {
+          result = await publishToTumblr(post, post.account);
         }
 
         post.status = 'published';
         post.publishedAt = new Date();
-        post.platformPostId = result?.id;
+        post.platformPostId = result?.id || result?.response?.id || result?.id_str;
         await post.save();
         console.log(`Published post ${post._id} to ${post.platform}`);
       } catch (error) {

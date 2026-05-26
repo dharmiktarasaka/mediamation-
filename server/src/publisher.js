@@ -3,6 +3,7 @@ import FormData from 'form-data';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { buildAuthorizationHeader } from './utils/oauth1.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -666,3 +667,68 @@ export const publishToTwitter = async (post, account) => {
     throw new Error(error.response?.data?.detail || error.response?.data?.message || error.message);
   }
 };
+
+export const publishToTumblr = async (post, account) => {
+  try {
+    console.log(`[Tumblr] Publishing post ${post._id}`);
+    
+    // Check if we have media
+    if (!post.media || post.media.length === 0) {
+      throw new Error('Tumblr photo post requires at least one image.');
+    }
+
+    // Resolve public URL for each media item
+    // (Uploads local images to tmpfiles.org if on localhost/127.0.0.1)
+    const mediaUrls = [];
+    for (const file of post.media) {
+      const publicUrl = await getPublicUrl(file.url);
+      mediaUrls.push(publicUrl);
+    }
+
+    const blogIdentifier = account.pageId; // this is the blog name, e.g. "myblog"
+    const url = `https://api.tumblr.com/v2/blog/${blogIdentifier}.tumblr.com/post`;
+
+    // Construct the request parameters
+    const requestParams = {
+      type: 'photo',
+      caption: post.content || '',
+    };
+
+    // If single image
+    if (mediaUrls.length === 1) {
+      requestParams.source = mediaUrls[0];
+    } else {
+      // For photoset, use source[0], source[1] etc.
+      mediaUrls.forEach((urlStr, index) => {
+        requestParams[`source[${index}]`] = urlStr;
+      });
+    }
+
+    // Build the Authorization Header
+    const authHeader = buildAuthorizationHeader(
+      'POST',
+      url,
+      requestParams,
+      process.env.TUMBLR_CONSUMER_KEY,
+      process.env.TUMBLR_CONSUMER_SECRET,
+      account.accessToken,
+      account.tokenSecret
+    );
+
+    // Make the POST request, passing the params in the query string
+    const { data } = await axios.post(url, null, {
+      params: requestParams,
+      headers: {
+        'Authorization': authHeader,
+      }
+    });
+
+    console.log(`[Tumblr] Post published successfully:`, data);
+    return data;
+  } catch (error) {
+    const errMsg = error.response?.data?.meta?.msg || error.response?.data?.response?.errors?.[0] || error.message;
+    console.error(`[Tumblr] Publishing error:`, error.response?.data || error.message);
+    throw new Error(`Tumblr publishing failed: ${errMsg}`);
+  }
+};
+
