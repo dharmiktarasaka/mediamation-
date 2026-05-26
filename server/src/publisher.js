@@ -686,7 +686,7 @@ export const publishToTumblr = async (post, account) => {
     }
 
     const blogIdentifier = account.pageId; // this is the blog name, e.g. "myblog"
-    const url = `https://api.tumblr.com/v2/blog/${blogIdentifier}.tumblr.com/post`;
+    const url = `https://api.tumblr.com/v2/blog/${blogIdentifier}/post`;
 
     // Construct the request parameters
     const requestParams = {
@@ -715,14 +715,13 @@ export const publishToTumblr = async (post, account) => {
       account.tokenSecret
     );
 
-    // Make the POST request, passing the params in the query string
-    const { data } = await axios.post(url, null, {
-      params: requestParams,
+    // Make the POST request, passing the params in the request body
+    const { data } = await axios.post(url, new URLSearchParams(requestParams), {
       headers: {
         'Authorization': authHeader,
+        'Content-Type': 'application/x-www-form-urlencoded',
       }
     });
-
     console.log(`[Tumblr] Post published successfully:`, data);
     return data;
   } catch (error) {
