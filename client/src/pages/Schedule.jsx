@@ -12,8 +12,8 @@ export default function Schedule() {
   const [uploadProgress, setUploadProgress] = useState('');
   const [generatingCaption, setGeneratingCaption] = useState(false);
   const [tone, setTone] = useState('attractive');
+  const [selectedAccountIds, setSelectedAccountIds] = useState([]);
   const [form, setForm] = useState({
-    accountId: '',
     content: '',
     scheduledAt: '',
     media: [],
@@ -139,6 +139,11 @@ export default function Schedule() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (selectedAccountIds.length === 0) {
+      toast.error('Please select at least one account to post to.');
+      return;
+    }
+
     try {
       const transformedMedia = media.map(m => ({
         url: m.url,
@@ -147,16 +152,25 @@ export default function Schedule() {
       
       const utcScheduledAt = new Date(form.scheduledAt).toISOString();
       
-      await postsAPI.create({
-        ...form,
-        scheduledAt: utcScheduledAt,
-        media: transformedMedia
-      });
-      toast.success('Post scheduled!');
-      setForm({ accountId: '', content: '', scheduledAt: '', media: [] });
+      // Schedule post for each selected account
+      await Promise.all(
+        selectedAccountIds.map(accId => 
+          postsAPI.create({
+            accountId: accId,
+            content: form.content,
+            scheduledAt: utcScheduledAt,
+            media: transformedMedia
+          })
+        )
+      );
+      
+      toast.success(`Post scheduled successfully for ${selectedAccountIds.length} account(s)!`);
+      setForm({ content: '', scheduledAt: '', media: [] });
+      setSelectedAccountIds([]);
       setMedia([]);
       loadData();
     } catch (err) {
+      console.error(err);
       toast.error(err.response?.data?.message || 'Failed to schedule post');
     }
   };
@@ -176,18 +190,72 @@ export default function Schedule() {
       <div className="card form-card">
         <h3>Schedule New Post</h3>
         <form onSubmit={handleSubmit}>
-          <select
-            value={form.accountId}
-            onChange={(e) => setForm({ ...form, accountId: e.target.value })}
-            required
-          >
-            <option value="">Select account</option>
-            {accounts.map((acc) => (
-              <option key={acc._id} value={acc._id}>
-                {acc.platform} — {acc.name}
-              </option>
-            ))}
-          </select>
+          <div className="account-selector-wrapper" style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', fontSize: '14px' }}>
+              Select Accounts to Post To
+            </label>
+            {accounts.length === 0 ? (
+              <p className="empty" style={{ padding: '12px' }}>No accounts connected yet. Connect accounts in the Dashboard.</p>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                  <button 
+                    type="button" 
+                    onClick={() => setSelectedAccountIds(accounts.map(a => a._id))}
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', color: 'var(--text)', cursor: 'pointer' }}
+                  >
+                    Select All
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setSelectedAccountIds([])}
+                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', color: 'var(--text)', cursor: 'pointer' }}
+                  >
+                    Clear All
+                  </button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
+                  {accounts.map((acc) => {
+                    const isSelected = selectedAccountIds.includes(acc._id);
+                    return (
+                      <div 
+                        key={acc._id}
+                        onClick={() => {
+                          if (isSelected) {
+                            setSelectedAccountIds(selectedAccountIds.filter(id => id !== acc._id));
+                          } else {
+                            setSelectedAccountIds([...selectedAccountIds, acc._id]);
+                          }
+                        }}
+                        style={{
+                          background: isSelected ? 'rgba(99, 102, 241, 0.1)' : 'rgba(30, 33, 54, 0.3)',
+                          border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
+                          borderRadius: '10px',
+                          padding: '12px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        <input 
+                          type="checkbox"
+                          checked={isSelected}
+                          readOnly
+                          style={{ width: '16px', height: '16px', margin: 0, cursor: 'pointer' }}
+                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', overflow: 'hidden' }}>
+                          <span className={`platform-badge ${acc.platform}`} style={{ alignSelf: 'flex-start', fontSize: '9px', padding: '2px 6px' }}>{acc.platform}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '500', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{acc.name}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
 
           <div className="media-upload">
             <h4>Media Upload (Carousel Support)</h4>
