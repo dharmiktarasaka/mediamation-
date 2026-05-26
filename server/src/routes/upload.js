@@ -66,13 +66,13 @@ router.post('/multiple', protect, upload.array('media', 10), async (req, res) =>
 
 // Generate AI caption based on uploaded file
 router.post('/generate-caption', protect, async (req, res) => {
-  const { filename, mimetype, tone } = req.body;
+  const { filename, mimetype, tone, url } = req.body;
   if (!filename || !mimetype) {
     return res.status(400).json({ message: 'filename and mimetype are required' });
   }
 
   try {
-    const { caption, isMock, reason, error } = await generateAICaption(filename, mimetype, tone, req.user);
+    const { caption, isMock, reason, error } = await generateAICaption(filename, mimetype, tone, req.user, url);
     res.json({ caption, isMock, reason, error });
   } catch (error) {
     console.error('[AI Caption Error]', error.message);

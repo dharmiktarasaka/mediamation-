@@ -32,6 +32,7 @@ export default function Schedule() {
         filename: imageFile.filename,
         mimetype: imageFile.mimetype,
         tone: tone,
+        url: imageFile.url,
       });
       setForm(prev => ({
         ...prev,

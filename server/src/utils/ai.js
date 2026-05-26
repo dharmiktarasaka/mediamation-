@@ -12,8 +12,7 @@ const MOCK_CAPTIONS = {
   advertisement: `📢 BIG NEWS! Our exclusive deal is now LIVE. Don't miss out on the perfect upgrade you've been waiting for. Click the link in bio to shop now! 🛍️🔥\n\n#shopnow #limitedtime #specialoffer #sale #deals #ad #exclusive #dontmissout`,
   marketing: `🎯 Want to scale your brand? Here are 3 simple tips to get started today: define your audience, write compelling hooks, and test consistently. Save this post for later! 📈💡\n\n#marketingtips #growthhacking #branding #digitalmarketing #socialmediamarketing #businesstips #strategy`
 };
-
-export async function generateAICaption(filename, mimetype, tone = 'attractive', user = null) {
+export async function generateAICaption(filename, mimetype, tone = 'attractive', user = null, url = null) {
   const mockCaption = MOCK_CAPTIONS[tone.toLowerCase()] || MOCK_CAPTIONS.attractive;
 
   // Determine api keys (defaults from .env, overridden by user settings if present)
@@ -61,19 +60,33 @@ Return ONLY the final caption text, ready to be copied. Do not add any conversat
     };
   }
 
-  const filePath = path.join(process.cwd(), 'uploads', filename);
-  if (!fs.existsSync(filePath)) {
+  let base64Data;
+  try {
+    if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+      console.log(`[AI Caption] Fetching remote image for AI analysis: ${url}`);
+      const imageRes = await axios.get(url, { responseType: 'arraybuffer' });
+      base64Data = Buffer.from(imageRes.data).toString('base64');
+    } else {
+      const filePath = path.join(process.cwd(), 'uploads', filename);
+      if (!fs.existsSync(filePath)) {
+        return {
+          caption: mockCaption,
+          isMock: true,
+          reason: 'api_error',
+          error: 'File not found on server.'
+        };
+      }
+      base64Data = Buffer.from(fs.readFileSync(filePath)).toString('base64');
+    }
+  } catch (readError) {
+    console.error('[AI Caption] Error reading file data:', readError.message);
     return {
       caption: mockCaption,
       isMock: true,
       reason: 'api_error',
-      error: 'File not found on server.'
+      error: `Failed to load image for AI analysis: ${readError.message}`
     };
   }
-
-  try {
-    const base64Data = Buffer.from(fs.readFileSync(filePath)).toString('base64');
-
     // 1. Try Groq (Llama-4 Scout Vision)
     if (provider === 'groq') {
       try {
