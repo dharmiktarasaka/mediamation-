@@ -60,8 +60,8 @@ Return ONLY the final caption text, ready to be copied. Do not add any conversat
     };
   }
 
-  let base64Data;
   try {
+    let base64Data;
     if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
       console.log(`[AI Caption] Fetching remote image for AI analysis: ${url}`);
       const imageRes = await axios.get(url, { responseType: 'arraybuffer' });
@@ -77,17 +77,7 @@ Return ONLY the final caption text, ready to be copied. Do not add any conversat
         };
       }
       base64Data = Buffer.from(fs.readFileSync(filePath)).toString('base64');
-    }
-  } catch (readError) {
-    console.error('[AI Caption] Error reading file data:', readError.message);
-    return {
-      caption: mockCaption,
-      isMock: true,
-      reason: 'api_error',
-      error: `Failed to load image for AI analysis: ${readError.message}`
-    };
-  }
-    // 1. Try Groq (Llama-4 Scout Vision)
+    }    // 1. Try Groq (Llama-4 Scout Vision)
     if (provider === 'groq') {
       try {
         console.log('[AI Caption] Generating using Groq Llama-4-scout-17b-16e-instruct...');
