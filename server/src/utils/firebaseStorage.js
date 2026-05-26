@@ -48,11 +48,7 @@ export const uploadLocalFileToFirebase = async (filePath, originalName, mimeType
 
     return publicUrl;
   } catch (error) {
-    console.error(`[Firebase Storage] Upload error:`, error.message);
-    // If the storage bucket is not enabled/found, give a descriptive explanation
-    if (error.message.includes('bucket') || error.code === 404) {
-      throw new Error('Firebase Storage is not enabled. Please go to your Firebase Console (console.firebase.google.com), click on "Storage", and click "Get Started" to enable your storage bucket.');
-    }
-    throw error;
+    console.error(`[Firebase Storage] Upload error details:`, error);
+    throw new Error(`Firebase Storage error: ${error.message} (Bucket: ${bucketName})`);
   }
 };
