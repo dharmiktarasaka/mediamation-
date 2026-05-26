@@ -395,7 +395,7 @@ router.get('/twitter', protect, (req, res) => {
     .update(TWITTER_OAUTH_VERIFIER)
     .digest('base64url');
   
-  const url = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${process.env.TWITTER_CLIENT_ID}&redirect_uri=${redirectUri}&scope=tweet.read%20tweet.write%20users.read%20offline.access&state=${req.user._id}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+  const url = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${process.env.TWITTER_CLIENT_ID}&redirect_uri=${redirectUri}&scope=tweet.read%20tweet.write%20users.read%20offline.access%20media.write&state=${req.user._id}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
   res.json({ url });
 });
 
