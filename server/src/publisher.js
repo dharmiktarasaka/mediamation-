@@ -202,10 +202,15 @@ const waitForInstagramMedia = async (containerId, accessToken, maxAttempts = 15,
         throw new Error(`Media processing failed on Instagram side: ${errorMsg}`);
       }
     } catch (err) {
+      if (err.response) {
+        // If it's a direct API response error (like 400 Bad Request, token expired, etc.), throw immediately
+        const errMsg = err.response.data?.error?.message || err.message;
+        throw new Error(`Meta API error: ${errMsg}`);
+      }
       if (err.message.includes('Media processing failed')) {
         throw err;
       }
-      console.warn(`[Instagram] Error checking container status on attempt ${attempt}:`, err.message);
+      console.warn(`[Instagram] Transient error checking container status on attempt ${attempt}:`, err.message);
     }
     await new Promise(resolve => setTimeout(resolve, delayMs));
   }
