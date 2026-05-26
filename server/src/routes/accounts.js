@@ -269,12 +269,24 @@ router.get('/facebook/callback', async (req, res) => {
       },
     });
 
-    const { access_token } = tokenRes.data;
+    const shortLivedToken = tokenRes.data.access_token;
+
+    // Exchange short-lived token for a long-lived (60-day) user token
+    const longLivedRes = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
+      params: {
+        grant_type: 'fb_exchange_token',
+        client_id: process.env.FACEBOOK_APP_ID,
+        client_secret: process.env.FACEBOOK_APP_SECRET,
+        fb_exchange_token: shortLivedToken,
+      },
+    });
+
+    const longLivedToken = longLivedRes.data.access_token;
 
     const pagesRes = await axios.get('https://graph.facebook.com/v21.0/me/accounts', {
       params: { 
         fields: 'name,access_token,picture,instagram_business_account',
-        access_token: access_token 
+        access_token: longLivedToken 
       },
     });
 
