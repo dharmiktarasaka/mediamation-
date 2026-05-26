@@ -1,9 +1,10 @@
 import admin from 'firebase-admin';
 import fs from 'fs';
+import crypto from 'crypto';
 
 /**
  * Uploads a local file to Firebase Storage bucket and deletes the local temporary file.
- * Falls back to signed URLs if the bucket is not public.
+ * Generates a persistent, public download URL using a download token metadata attribute.
  */
 export const uploadLocalFileToFirebase = async (filePath, originalName, mimeType) => {
   if (!admin.apps.length) {
@@ -18,30 +19,22 @@ export const uploadLocalFileToFirebase = async (filePath, originalName, mimeType
   console.log(`[Firebase Storage] Uploading ${filePath} to gs://${bucketName}/${destination}...`);
 
   try {
+    // Generate a unique token for the download URL
+    const downloadToken = crypto.randomBytes(16).toString('hex');
+
     await bucket.upload(filePath, {
       destination: destination,
       metadata: {
         contentType: mimeType,
+        metadata: {
+          firebaseStorageDownloadTokens: downloadToken,
+        }
       },
     });
 
-    const fileRef = bucket.file(destination);
-    let publicUrl;
-
-    try {
-      // Make the file publicly readable
-      await fileRef.makePublic();
-      publicUrl = `https://storage.googleapis.com/${bucketName}/${destination}`;
-      console.log(`[Firebase Storage] File made public: ${publicUrl}`);
-    } catch (makePublicError) {
-      console.warn(`[Firebase Storage] makePublic failed, falling back to signed URL:`, makePublicError.message);
-      // Fallback: Generate a long-lived URL (e.g. 50 years into the future)
-      const [signedUrl] = await fileRef.getSignedUrl({
-        action: 'read',
-        expires: '03-01-2076', // Far in the future
-      });
-      publicUrl = signedUrl;
-    }
+    // Construct the direct Firebase download URL
+    const publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(destination)}?alt=media&token=${downloadToken}`;
+    console.log(`[Firebase Storage] File uploaded successfully. Public URL: ${publicUrl}`);
 
     // Safely delete the local temporary file
     try {
