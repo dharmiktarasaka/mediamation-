@@ -7,7 +7,11 @@ import { IgApiClient, IgCheckpointError } from 'instagram-private-api';
 
 const router = Router();
 const TWITTER_OAUTH_VERIFIER = 'twitter_oauth_verifier_key_mediamation_static_v2';
-const clientUrl = (process.env.CLIENT_URL || 'https://mediamation.vercel.app').replace(/\/$/, '');
+let clientUrl = process.env.CLIENT_URL || 'https://mediamation.vercel.app';
+if (!clientUrl.startsWith('http://') && !clientUrl.startsWith('https://')) {
+  clientUrl = 'https://mediamation.vercel.app';
+}
+clientUrl = clientUrl.replace(/\/$/, '');
 
 router.get('/', protect, async (req, res) => {
   try {

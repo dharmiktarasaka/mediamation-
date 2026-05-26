@@ -6,7 +6,11 @@ import axios from 'axios';
 import Account from '../models/Account.js';
 
 const router = Router();
-const clientUrl = (process.env.CLIENT_URL || 'https://mediamation.vercel.app').replace(/\/$/, '');
+let clientUrl = process.env.CLIENT_URL || 'https://mediamation.vercel.app';
+if (!clientUrl.startsWith('http://') && !clientUrl.startsWith('https://')) {
+  clientUrl = 'https://mediamation.vercel.app';
+}
+clientUrl = clientUrl.replace(/\/$/, '');
 
 router.post('/register', [
   body('name').trim().notEmpty().withMessage('Name is required'),
