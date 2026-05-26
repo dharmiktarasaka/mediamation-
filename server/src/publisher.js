@@ -179,6 +179,39 @@ export const publishToFacebook = async (post, account) => {
   }
 };
 
+const waitForInstagramMedia = async (containerId, accessToken, maxAttempts = 15, delayMs = 3000) => {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      console.log(`[Instagram] Checking container ${containerId} status (Attempt ${attempt}/${maxAttempts})...`);
+      const { data } = await axios.get(`https://graph.facebook.com/v21.0/${containerId}`, {
+        params: {
+          fields: 'status_code,error',
+          access_token: accessToken
+        }
+      });
+      
+      const statusCode = data.status_code;
+      console.log(`[Instagram] Container ${containerId} status: ${statusCode}`);
+      
+      if (statusCode === 'FINISHED') {
+        return true;
+      }
+      
+      if (statusCode === 'ERROR') {
+        const errorMsg = data.error || 'Unknown container processing error';
+        throw new Error(`Media processing failed on Instagram side: ${errorMsg}`);
+      }
+    } catch (err) {
+      if (err.message.includes('Media processing failed')) {
+        throw err;
+      }
+      console.warn(`[Instagram] Error checking container status on attempt ${attempt}:`, err.message);
+    }
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+  }
+  throw new Error('Timeout waiting for Instagram media to finish processing on Meta servers.');
+};
+
 export const publishToInstagram = async (post, account) => {
   try {
     console.log(`[Instagram] Publishing post ${post._id} with ${post.media.length} media item(s)`);
@@ -274,6 +307,10 @@ export const publishToInstagram = async (post, account) => {
         null,
         { params }
       );
+      
+      // Wait for container to finish processing
+      await waitForInstagramMedia(container.id, account.accessToken);
+
       const { data } = await axios.post(
         `https://graph.facebook.com/v21.0/${account.instagramBusinessId}/media_publish`,
         null,
@@ -303,6 +340,12 @@ export const publishToInstagram = async (post, account) => {
         children.push(mediaItem.id);
       }
 
+      // Wait for all child containers to finish processing
+      console.log(`[Instagram] Waiting for all ${children.length} carousel item containers to finish processing...`);
+      for (const childId of children) {
+        await waitForInstagramMedia(childId, account.accessToken);
+      }
+
       if (children.length > 0) {
         const { data: carousel } = await axios.post(
           `https://graph.facebook.com/v21.0/${account.instagramBusinessId}/media`,
@@ -316,6 +359,10 @@ export const publishToInstagram = async (post, account) => {
             },
           }
         );
+        
+        // Wait for the carousel container to finish processing
+        await waitForInstagramMedia(carousel.id, account.accessToken);
+
         const { data } = await axios.post(
           `https://graph.facebook.com/v21.0/${account.instagramBusinessId}/media_publish`,
           null,
