@@ -119,6 +119,17 @@ export default function Dashboard() {
     }
   };
 
+  const handleDisconnectAccount = async (id) => {
+    if (!window.confirm('Are you sure you want to disconnect this account?')) return;
+    try {
+      await accountsAPI.disconnect(id);
+      toast.success('Account disconnected successfully!');
+      setAccounts(accounts.filter((acc) => acc._id !== id));
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to disconnect account.');
+    }
+  };
+
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -134,9 +145,35 @@ export default function Dashboard() {
           ) : (
             <ul className="account-list">
               {accounts.map((acc) => (
-                <li key={acc._id}>
-                  <span className={`platform-badge ${acc.platform}`}>{acc.platform}</span>
-                  {acc.name}
+                <li key={acc._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <span className={`platform-badge ${acc.platform}`} style={{ marginRight: '8px' }}>{acc.platform}</span>
+                    {acc.name}
+                  </div>
+                  <button 
+                    onClick={() => handleDisconnectAccount(acc._id)}
+                    style={{
+                      background: 'transparent',
+                      color: 'var(--danger)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                      padding: '4px 10px',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.target.style.background = 'rgba(239, 68, 68, 0.1)';
+                      e.target.style.borderColor = 'var(--danger)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.target.style.background = 'transparent';
+                      e.target.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+                    }}
+                  >
+                    Disconnect
+                  </button>
                 </li>
               ))}
             </ul>
