@@ -15,6 +15,9 @@ const getLocalFile = (mediaUrl) => {
   if (fs.existsSync(filePath)) {
     return { path: filePath, filename };
   }
+  if (mediaUrl.includes('localhost') || mediaUrl.includes('127.0.0.1')) {
+    throw new Error('This post contains a local media URL (localhost), but the file does not exist on this server. Please create a new post in the deployed environment and upload the media.');
+  }
   return null;
 };
 
