@@ -2,7 +2,7 @@ import express from 'express';
 import { protect } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';
 import { generateAICaption } from '../utils/ai.js';
-import { uploadLocalFileToFirebase } from '../utils/firebaseStorage.js';
+import { uploadLocalFileToCloudinary } from '../utils/cloudinary.js';
 
 const router = express.Router();
 
@@ -13,9 +13,8 @@ router.post('/', protect, upload.single('media'), async (req, res) => {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    const publicUrl = await uploadLocalFileToFirebase(
+    const publicUrl = await uploadLocalFileToCloudinary(
       req.file.path,
-      req.file.originalname,
       req.file.mimetype
     );
 
@@ -43,9 +42,8 @@ router.post('/multiple', protect, upload.array('media', 10), async (req, res) =>
 
     const files = [];
     for (const file of req.files) {
-      const publicUrl = await uploadLocalFileToFirebase(
+      const publicUrl = await uploadLocalFileToCloudinary(
         file.path,
-        file.originalname,
         file.mimetype
       );
       files.push({
