@@ -203,19 +203,19 @@ export default function Schedule() {
                   <button 
                     type="button" 
                     onClick={() => setSelectedAccountIds(accounts.map(a => a._id))}
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', color: 'var(--text)', cursor: 'pointer' }}
+                    className="btn-clear-selection"
                   >
                     Select All
                   </button>
                   <button 
                     type="button" 
                     onClick={() => setSelectedAccountIds([])}
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: '6px', padding: '6px 12px', fontSize: '12px', color: 'var(--text)', cursor: 'pointer' }}
+                    className="btn-clear-selection"
                   >
                     Clear All
                   </button>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
+                <div className="platform-select-grid">
                   {accounts.map((acc) => {
                     const isSelected = selectedAccountIds.includes(acc._id);
                     return (
@@ -228,23 +228,13 @@ export default function Schedule() {
                             setSelectedAccountIds([...selectedAccountIds, acc._id]);
                           }
                         }}
-                        style={{
-                          background: isSelected ? 'rgba(99, 102, 241, 0.1)' : 'rgba(30, 33, 54, 0.3)',
-                          border: isSelected ? '1px solid var(--primary)' : '1px solid var(--border)',
-                          borderRadius: '10px',
-                          padding: '12px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '10px',
-                          transition: 'all 0.2s',
-                        }}
+                        className={`platform-select-card ${isSelected ? 'selected' : ''}`}
                       >
                         <input 
                           type="checkbox"
                           checked={isSelected}
                           readOnly
-                          style={{ width: '16px', height: '16px', margin: 0, cursor: 'pointer' }}
+                          className="platform-select-checkbox"
                         />
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', overflow: 'hidden' }}>
                           <span className={`platform-badge ${acc.platform}`} style={{ alignSelf: 'flex-start', fontSize: '9px', padding: '2px 6px' }}>{acc.platform}</span>
