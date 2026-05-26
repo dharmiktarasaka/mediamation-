@@ -88,12 +88,18 @@ router.get('/instagram/callback', async (req, res) => {
   }
 
   try {
+    const host = req.get('host');
+    const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+    const redirectUri = isLocal
+      ? 'http://localhost:5000/api/auth/instagram/callback'
+      : 'https://mediamation.onrender.com/api/auth/instagram/callback';
+
     // 1. Get short-lived token
     const formData = new URLSearchParams();
     formData.append('client_id', process.env.INSTAGRAM_APP_ID);
     formData.append('client_secret', process.env.INSTAGRAM_APP_SECRET);
     formData.append('grant_type', 'authorization_code');
-    formData.append('redirect_uri', process.env.INSTAGRAM_REDIRECT_URI);
+    formData.append('redirect_uri', redirectUri);
     formData.append('code', code);
 
     const tokenRes = await axios.post('https://api.instagram.com/oauth/access_token', formData, {

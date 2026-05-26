@@ -338,22 +338,36 @@ router.get('/facebook/callback', async (req, res) => {
 });
 
 router.get('/instagram', protect, (req, res) => {
-  const url = `https://api.instagram.com/oauth/authorize?client_id=${process.env.INSTAGRAM_APP_ID}&redirect_uri=${process.env.INSTAGRAM_REDIRECT_URI}&scope=instagram_business_basic,instagram_business_content_publish&response_type=code&state=${req.user._id}`;
+  const host = req.get('host');
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+  const redirectUri = isLocal
+    ? 'http://localhost:5000/api/auth/instagram/callback'
+    : 'https://mediamation.onrender.com/api/auth/instagram/callback';
+
+  const url = `https://api.instagram.com/oauth/authorize?client_id=${process.env.INSTAGRAM_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=instagram_business_basic,instagram_business_content_publish&response_type=code&state=${req.user._id}`;
   res.json({ url });
 });
 
 router.get('/pinterest', protect, (req, res) => {
-  const redirectUri = encodeURIComponent(process.env.PINTEREST_REDIRECT_URI || 'http://localhost:5000/api/accounts/pinterest/callback');
-  const url = `https://www.pinterest.com/oauth/?client_id=${process.env.PINTEREST_CLIENT_ID}&redirect_uri=${redirectUri}&response_type=code&scope=boards:read,boards:write,pins:read,pins:write,user_accounts:read&state=${req.user._id}`;
+  const host = req.get('host');
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+  const redirectUri = isLocal
+    ? 'http://localhost:5000/api/accounts/pinterest/callback'
+    : 'https://mediamation.onrender.com/api/accounts/pinterest/callback';
+
+  const url = `https://www.pinterest.com/oauth/?client_id=${process.env.PINTEREST_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=boards:read,boards:write,pins:read,pins:write,user_accounts:read&state=${req.user._id}`;
   res.json({ url });
 });
 
 router.get('/pinterest/callback', async (req, res) => {
   const { code, state } = req.query;
   try {
-    const redirectUri = process.env.PINTEREST_REDIRECT_URI || 'http://localhost:5000/api/accounts/pinterest/callback';
+    const host = req.get('host');
+    const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+    const redirectUri = isLocal
+      ? 'http://localhost:5000/api/accounts/pinterest/callback'
+      : 'https://mediamation.onrender.com/api/accounts/pinterest/callback';
     const pinterestBaseUrl = process.env.PINTEREST_USE_SANDBOX === 'true' ? 'https://api-sandbox.pinterest.com/v5' : 'https://api.pinterest.com/v5';
-    
     // Exchange authorization code for access token
     const tokenRes = await axios.post(`${pinterestBaseUrl}/oauth/token`, 
       new URLSearchParams({
@@ -406,20 +420,29 @@ router.get('/pinterest/callback', async (req, res) => {
 });
 
 router.get('/twitter', protect, (req, res) => {
-  const redirectUri = encodeURIComponent(process.env.TWITTER_REDIRECT_URI || 'http://localhost:5000/api/accounts/twitter/callback');
+  const host = req.get('host');
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+  const redirectUri = isLocal
+    ? 'http://localhost:5000/api/accounts/twitter/callback'
+    : 'https://mediamation.onrender.com/api/accounts/twitter/callback';
+
   const codeChallenge = crypto
     .createHash('sha256')
     .update(TWITTER_OAUTH_VERIFIER)
     .digest('base64url');
   
-  const url = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${process.env.TWITTER_CLIENT_ID}&redirect_uri=${redirectUri}&scope=tweet.read%20tweet.write%20users.read%20offline.access%20media.write&state=${req.user._id}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+  const url = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${process.env.TWITTER_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20tweet.write%20users.read%20offline.access%20media.write&state=${req.user._id}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
   res.json({ url });
 });
 
 router.get('/twitter/callback', async (req, res) => {
   const { code, state } = req.query;
   try {
-    const redirectUri = process.env.TWITTER_REDIRECT_URI || 'http://localhost:5000/api/accounts/twitter/callback';
+    const host = req.get('host');
+    const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+    const redirectUri = isLocal
+      ? 'http://localhost:5000/api/accounts/twitter/callback'
+      : 'https://mediamation.onrender.com/api/accounts/twitter/callback';
 
     const tokenRes = await axios.post('https://api.twitter.com/2/oauth2/token',
       new URLSearchParams({
