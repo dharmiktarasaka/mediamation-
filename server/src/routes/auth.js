@@ -6,6 +6,7 @@ import axios from 'axios';
 import Account from '../models/Account.js';
 
 const router = Router();
+const clientUrl = (process.env.CLIENT_URL || 'https://mediamation.vercel.app').replace(/\/$/, '');
 
 router.post('/register', [
   body('name').trim().notEmpty().withMessage('Name is required'),
@@ -79,7 +80,7 @@ router.put('/settings', protect, async (req, res) => {
 router.get('/instagram/callback', async (req, res) => {
   const { code, state } = req.query;
   if (!code) {
-    return res.redirect(`${process.env.CLIENT_URL}/dashboard?error=instagram_auth_failed`);
+    return res.redirect(`${clientUrl}/dashboard?error=instagram_auth_failed`);
   }
 
   try {
@@ -137,10 +138,10 @@ router.get('/instagram/callback', async (req, res) => {
       { upsert: true, new: true }
     );
 
-    res.redirect(`${process.env.CLIENT_URL}/dashboard?connected=instagram`);
+    res.redirect(`${clientUrl}/dashboard?connected=instagram`);
   } catch (error) {
     console.error('Instagram direct callback error:', error.response?.data || error.message);
-    res.redirect(`${process.env.CLIENT_URL}/dashboard?error=instagram_auth_failed`);
+    res.redirect(`${clientUrl}/dashboard?error=instagram_auth_failed`);
   }
 });
 

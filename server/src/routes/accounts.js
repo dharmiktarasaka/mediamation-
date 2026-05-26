@@ -7,6 +7,7 @@ import { IgApiClient, IgCheckpointError } from 'instagram-private-api';
 
 const router = Router();
 const TWITTER_OAUTH_VERIFIER = 'twitter_oauth_verifier_key_mediamation_static_v2';
+const clientUrl = (process.env.CLIENT_URL || 'https://mediamation.vercel.app').replace(/\/$/, '');
 
 router.get('/', protect, async (req, res) => {
   try {
@@ -310,13 +311,13 @@ router.get('/facebook/callback', async (req, res) => {
     }
 
     if (!pagesRes.data.data || pagesRes.data.data.length === 0) {
-      return res.redirect(`${process.env.CLIENT_URL}/dashboard?error=no_pages_found`);
+      return res.redirect(`${clientUrl}/dashboard?error=no_pages_found`);
     }
 
-    res.redirect(`${process.env.CLIENT_URL}/dashboard?connected=facebook`);
+    res.redirect(`${clientUrl}/dashboard?connected=facebook`);
   } catch (error) {
     console.error('Facebook callback error:', error.response?.data || error.message);
-    res.redirect(`${process.env.CLIENT_URL}/dashboard?error=facebook_auth_failed`);
+    res.redirect(`${clientUrl}/dashboard?error=facebook_auth_failed`);
   }
 });
 
@@ -381,10 +382,10 @@ router.get('/pinterest/callback', async (req, res) => {
       { upsert: true, new: true }
     );
 
-    res.redirect(`${process.env.CLIENT_URL}/dashboard?connected=pinterest`);
+    res.redirect(`${clientUrl}/dashboard?connected=pinterest`);
   } catch (error) {
     console.error('Pinterest callback error:', error.response?.data || error.message);
-    res.redirect(`${process.env.CLIENT_URL}/dashboard?error=pinterest_auth_failed`);
+    res.redirect(`${clientUrl}/dashboard?error=pinterest_auth_failed`);
   }
 });
 
@@ -452,10 +453,10 @@ router.get('/twitter/callback', async (req, res) => {
       { upsert: true, new: true }
     );
 
-    res.redirect(`${process.env.CLIENT_URL}/dashboard?connected=twitter`);
+    res.redirect(`${clientUrl}/dashboard?connected=twitter`);
   } catch (error) {
     console.error('Twitter callback error:', error.response?.data || error.message);
-    res.redirect(`${process.env.CLIENT_URL}/dashboard?error=twitter_auth_failed`);
+    res.redirect(`${clientUrl}/dashboard?error=twitter_auth_failed`);
   }
 });
 
