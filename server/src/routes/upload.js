@@ -1,22 +1,23 @@
 import express from 'express';
 import { protect } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';
-import path from 'path';
-
 import { generateAICaption } from '../utils/ai.js';
+import { uploadLocalFileToFirebase } from '../utils/firebaseStorage.js';
 
 const router = express.Router();
-const fileUrl = (req, filename) => {
-  const host = req.get('host');
-  const protocol = (host.includes('localhost') || host.includes('127.0.0.1')) ? 'http' : 'https';
-  return `${protocol}://${host}/uploads/${filename}`;
-};
+
 // Handle single file upload
-router.post('/', protect, upload.single('media'), (req, res) => {
+router.post('/', protect, upload.single('media'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
+
+    const publicUrl = await uploadLocalFileToFirebase(
+      req.file.path,
+      req.file.originalname,
+      req.file.mimetype
+    );
 
     res.json({
       message: 'File uploaded successfully',
@@ -25,7 +26,7 @@ router.post('/', protect, upload.single('media'), (req, res) => {
         originalname: req.file.originalname,
         mimetype: req.file.mimetype,
         size: req.file.size,
-        url: fileUrl(req, req.file.filename)
+        url: publicUrl
       }
     });
   } catch (error) {
@@ -34,19 +35,27 @@ router.post('/', protect, upload.single('media'), (req, res) => {
 });
 
 // Handle multiple file upload
-router.post('/multiple', protect, upload.array('media', 10), (req, res) => {
+router.post('/multiple', protect, upload.array('media', 10), async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ message: 'No files uploaded' });
     }
 
-    const files = req.files.map(file => ({
-      filename: file.filename,
-      originalname: file.originalname,
-      mimetype: file.mimetype,
-      size: file.size,
-      url: fileUrl(req, file.filename)
-    }));
+    const files = [];
+    for (const file of req.files) {
+      const publicUrl = await uploadLocalFileToFirebase(
+        file.path,
+        file.originalname,
+        file.mimetype
+      );
+      files.push({
+        filename: file.filename,
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+        size: file.size,
+        url: publicUrl
+      });
+    }
 
     res.json({
       message: 'Files uploaded successfully',
