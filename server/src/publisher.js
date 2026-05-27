@@ -186,7 +186,7 @@ const waitForInstagramMedia = async (containerId, accessToken, maxAttempts = 15,
       console.log(`[Instagram] Checking container ${containerId} status (Attempt ${attempt}/${maxAttempts})...`);
       const { data } = await axios.get(`https://graph.facebook.com/v21.0/${containerId}`, {
         params: {
-          fields: 'status_code,error',
+          fields: 'status_code,status',
           access_token: accessToken
         }
       });
@@ -199,7 +199,7 @@ const waitForInstagramMedia = async (containerId, accessToken, maxAttempts = 15,
       }
       
       if (statusCode === 'ERROR') {
-        const errorMsg = data.error || 'Unknown container processing error';
+        const errorMsg = data.status || 'Unknown container processing error';
         throw new Error(`Media processing failed on Instagram side: ${errorMsg}`);
       }
     } catch (err) {
