@@ -649,6 +649,12 @@ router.get('/tumblr/callback', async (req, res) => {
 });
 
 router.get('/google', protect, (req, res) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    return res.status(400).json({ 
+      message: 'Google Client ID or Client Secret is not loaded in the server. Please check your .env file and RESTART your backend server.' 
+    });
+  }
+
   const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
   const host = req.get('host');
   const redirectUri = `${protocol}://${host}/api/accounts/google/callback`;
@@ -659,7 +665,7 @@ router.get('/google', protect, (req, res) => {
     'email'
   ];
 
-  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}&state=${req.user._id}&access_type=offline&prompt=consent`;
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID.trim()}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}&state=${req.user._id}&access_type=offline&prompt=consent`;
   res.json({ url });
 });
 
