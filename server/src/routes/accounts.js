@@ -340,22 +340,18 @@ router.get('/facebook/callback', async (req, res) => {
 });
 
 router.get('/instagram', protect, (req, res) => {
+  const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
   const host = req.get('host');
-  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
-  const redirectUri = isLocal
-    ? 'http://localhost:5000/api/auth/instagram/callback'
-    : 'https://mediamation.onrender.com/api/auth/instagram/callback';
+  const redirectUri = `${protocol}://${host}/api/auth/instagram/callback`;
 
   const url = `https://api.instagram.com/oauth/authorize?client_id=${process.env.INSTAGRAM_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=instagram_business_basic,instagram_business_content_publish&response_type=code&state=${req.user._id}`;
   res.json({ url });
 });
 
 router.get('/pinterest', protect, (req, res) => {
+  const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
   const host = req.get('host');
-  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
-  const redirectUri = isLocal
-    ? 'http://localhost:5000/api/accounts/pinterest/callback'
-    : 'https://mediamation.onrender.com/api/accounts/pinterest/callback';
+  const redirectUri = `${protocol}://${host}/api/accounts/pinterest/callback`;
 
   const url = `https://www.pinterest.com/oauth/?client_id=${process.env.PINTEREST_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=boards:read,boards:write,pins:read,pins:write,user_accounts:read&state=${req.user._id}`;
   res.json({ url });
@@ -364,11 +360,9 @@ router.get('/pinterest', protect, (req, res) => {
 router.get('/pinterest/callback', async (req, res) => {
   const { code, state } = req.query;
   try {
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
     const host = req.get('host');
-    const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
-    const redirectUri = isLocal
-      ? 'http://localhost:5000/api/accounts/pinterest/callback'
-      : 'https://mediamation.onrender.com/api/accounts/pinterest/callback';
+    const redirectUri = `${protocol}://${host}/api/accounts/pinterest/callback`;
     const pinterestBaseUrl = process.env.PINTEREST_USE_SANDBOX === 'true' ? 'https://api-sandbox.pinterest.com/v5' : 'https://api.pinterest.com/v5';
     // Exchange authorization code for access token
     const tokenRes = await axios.post(`${pinterestBaseUrl}/oauth/token`, 
@@ -422,11 +416,9 @@ router.get('/pinterest/callback', async (req, res) => {
 });
 
 router.get('/twitter', protect, (req, res) => {
+  const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
   const host = req.get('host');
-  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
-  const redirectUri = isLocal
-    ? 'http://localhost:5000/api/accounts/twitter/callback'
-    : 'https://mediamation.onrender.com/api/accounts/twitter/callback';
+  const redirectUri = `${protocol}://${host}/api/accounts/twitter/callback`;
 
   const codeChallenge = crypto
     .createHash('sha256')
@@ -440,11 +432,9 @@ router.get('/twitter', protect, (req, res) => {
 router.get('/twitter/callback', async (req, res) => {
   const { code, state } = req.query;
   try {
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
     const host = req.get('host');
-    const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
-    const redirectUri = isLocal
-      ? 'http://localhost:5000/api/accounts/twitter/callback'
-      : 'https://mediamation.onrender.com/api/accounts/twitter/callback';
+    const redirectUri = `${protocol}://${host}/api/accounts/twitter/callback`;
 
     const tokenRes = await axios.post('https://api.twitter.com/2/oauth2/token',
       new URLSearchParams({
@@ -517,11 +507,9 @@ const TumblrTemp = mongoose.models.TumblrTemp || mongoose.model('TumblrTemp', Tu
 // Tumblr OAuth 1.0a Initiate
 router.get('/tumblr', protect, async (req, res) => {
   try {
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
     const host = req.get('host');
-    const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
-    const callbackUrl = isLocal
-      ? 'http://localhost:5000/api/accounts/tumblr/callback'
-      : 'https://mediamation.onrender.com/api/accounts/tumblr/callback';
+    const callbackUrl = `${protocol}://${host}/api/accounts/tumblr/callback`;
 
     const url = 'https://www.tumblr.com/oauth/request_token';
     const authHeader = buildAuthorizationHeader(
@@ -661,11 +649,9 @@ router.get('/tumblr/callback', async (req, res) => {
 });
 
 router.get('/google', protect, (req, res) => {
+  const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
   const host = req.get('host');
-  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
-  const redirectUri = isLocal
-    ? 'http://localhost:5000/api/accounts/google/callback'
-    : 'https://mediamation.onrender.com/api/accounts/google/callback';
+  const redirectUri = `${protocol}://${host}/api/accounts/google/callback`;
 
   const scopes = [
     'https://www.googleapis.com/auth/business.manage',
@@ -680,11 +666,9 @@ router.get('/google', protect, (req, res) => {
 router.get('/google/callback', async (req, res) => {
   const { code, state } = req.query;
   try {
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
     const host = req.get('host');
-    const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
-    const redirectUri = isLocal
-      ? 'http://localhost:5000/api/accounts/google/callback'
-      : 'https://mediamation.onrender.com/api/accounts/google/callback';
+    const redirectUri = `${protocol}://${host}/api/accounts/google/callback`;
 
     // 1. Exchange auth code for tokens
     const tokenRes = await axios.post('https://oauth2.googleapis.com/token', {

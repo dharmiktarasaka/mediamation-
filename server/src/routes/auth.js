@@ -88,11 +88,9 @@ router.get('/instagram/callback', async (req, res) => {
   }
 
   try {
+    const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
     const host = req.get('host');
-    const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
-    const redirectUri = isLocal
-      ? 'http://localhost:5000/api/auth/instagram/callback'
-      : 'https://mediamation.onrender.com/api/auth/instagram/callback';
+    const redirectUri = `${protocol}://${host}/api/auth/instagram/callback`;
 
     // 1. Get short-lived token
     const formData = new URLSearchParams();
