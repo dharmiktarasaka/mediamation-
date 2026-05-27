@@ -208,6 +208,7 @@ export default function History() {
               <option value="pinterest">Pinterest</option>
               <option value="twitter">Twitter (X)</option>
               <option value="tumblr">Tumblr</option>
+              <option value="google">Google My Business</option>
             </select>
           </div>
         </div>

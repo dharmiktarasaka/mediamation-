@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const accountSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  platform: { type: String, enum: ['instagram', 'facebook', 'pinterest', 'twitter', 'tumblr'], required: true },
+  platform: { type: String, enum: ['instagram', 'facebook', 'pinterest', 'twitter', 'tumblr', 'google'], required: true },
   platformUserId: { type: String },
   name: { type: String },
   avatar: { type: String },

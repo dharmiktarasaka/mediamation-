@@ -660,4 +660,109 @@ router.get('/tumblr/callback', async (req, res) => {
   }
 });
 
+router.get('/google', protect, (req, res) => {
+  const host = req.get('host');
+  const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+  const redirectUri = isLocal
+    ? 'http://localhost:5000/api/accounts/google/callback'
+    : 'https://mediamation.onrender.com/api/accounts/google/callback';
+
+  const scopes = [
+    'https://www.googleapis.com/auth/business.manage',
+    'profile',
+    'email'
+  ];
+
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}&state=${req.user._id}&access_type=offline&prompt=consent`;
+  res.json({ url });
+});
+
+router.get('/google/callback', async (req, res) => {
+  const { code, state } = req.query;
+  try {
+    const host = req.get('host');
+    const isLocal = host.includes('localhost') || host.includes('127.0.0.1');
+    const redirectUri = isLocal
+      ? 'http://localhost:5000/api/accounts/google/callback'
+      : 'https://mediamation.onrender.com/api/accounts/google/callback';
+
+    // 1. Exchange auth code for tokens
+    const tokenRes = await axios.post('https://oauth2.googleapis.com/token', {
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: redirectUri,
+      grant_type: 'authorization_code',
+    });
+
+    const { access_token, refresh_token, expires_in } = tokenRes.data;
+
+    // 2. Fetch Google user info (to display avatar and name)
+    const userRes = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: {
+        'Authorization': `Bearer ${access_token}`
+      }
+    });
+    const profile = userRes.data;
+    const userName = profile.name || 'Google Business User';
+    const userAvatar = profile.picture || null;
+
+    // 3. Fetch Google Business Profile Accounts
+    const accountsRes = await axios.get('https://mybusiness.googleapis.com/v4/accounts', {
+      headers: {
+        'Authorization': `Bearer ${access_token}`
+      }
+    });
+
+    const googleAccounts = accountsRes.data.accounts || [];
+    let locationsConnectedCount = 0;
+
+    // 4. Fetch Locations for each Account and store them in the DB
+    for (const gAccount of googleAccounts) {
+      const locationsRes = await axios.get(`https://mybusiness.googleapis.com/v4/${gAccount.name}/locations`, {
+        headers: {
+          'Authorization': `Bearer ${access_token}`
+        }
+      });
+
+      const locations = locationsRes.data.locations || [];
+      for (const loc of locations) {
+        // Use full location resource name (e.g. accounts/{accountId}/locations/{locationId}) as platformUserId
+        const platformUserId = loc.name; 
+        const name = loc.title || loc.locationName || userName;
+
+        const updateData = {
+          user: state,
+          platform: 'google',
+          platformUserId,
+          name: `${name} (Google)`,
+          avatar: userAvatar,
+          accessToken: access_token,
+          tokenExpiresAt: new Date(Date.now() + expires_in * 1000),
+        };
+
+        if (refresh_token) {
+          updateData.refreshToken = refresh_token;
+        }
+
+        await Account.findOneAndUpdate(
+          { platformUserId, platform: 'google' },
+          updateData,
+          { upsert: true, new: true }
+        );
+        locationsConnectedCount++;
+      }
+    }
+
+    if (locationsConnectedCount === 0) {
+      return res.redirect(`${clientUrl}/dashboard?error=no_gmb_locations_found`);
+    }
+
+    res.redirect(`${clientUrl}/dashboard?connected=google`);
+  } catch (error) {
+    console.error('Google GMB callback error:', error.response?.data || error.message);
+    res.redirect(`${clientUrl}/dashboard?error=google_auth_failed`);
+  }
+});
+
 export default router;

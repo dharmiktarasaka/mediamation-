@@ -6,7 +6,8 @@ import {
   publishToInstagram, 
   publishToPinterest, 
   publishToTwitter, 
-  publishToTumblr 
+  publishToTumblr,
+  publishToGoogle
 } from './publisher.js';
 
 export const startScheduler = () => {
@@ -51,6 +52,8 @@ export const startScheduler = () => {
           result = await publishToTwitter(post, post.account);
         } else if (post.platform === 'tumblr') {
           result = await publishToTumblr(post, post.account);
+        } else if (post.platform === 'google') {
+          result = await publishToGoogle(post, post.account);
         }
 
         post.status = 'published';

@@ -40,6 +40,7 @@ export const accountsAPI = {
   pinterestAuth: () => api.get('/accounts/pinterest'),
   twitterAuth: () => api.get('/accounts/twitter'),
   tumblrAuth: () => api.get('/accounts/tumblr'),
+  googleAuth: () => api.get('/accounts/google'),
   connectFacebook: (data) => api.post('/accounts/connect-facebook', data),
   connectInstagramPrivate: (data) => api.post('/accounts/connect-instagram-private', data),
 };

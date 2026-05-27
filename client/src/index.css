@@ -600,6 +600,9 @@ button:disabled, .btn-primary:disabled {
 .account-list li:has(.platform-badge.tumblr):hover {
   border-left-color: #35465c;
 }
+.account-list li:has(.platform-badge.google):hover {
+  border-left-color: #4285f4;
+}
 
 /* Badges */
 .platform-badge {
@@ -635,6 +638,11 @@ button:disabled, .btn-primary:disabled {
 
 .platform-badge.tumblr {
   background: #35465c;
+  color: white;
+}
+
+.platform-badge.google {
+  background: #4285f4;
   color: white;
 }
 

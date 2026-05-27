@@ -40,6 +40,12 @@ export default function Dashboard() {
       toast.success('Tumblr account connected successfully!');
     } else if (searchParams.get('error') === 'tumblr_auth_failed') {
       toast.error('Failed to connect Tumblr account.');
+    } else if (searchParams.get('connected') === 'google') {
+      toast.success('Google Business Profile connected successfully!');
+    } else if (searchParams.get('error') === 'google_auth_failed') {
+      toast.error('Failed to connect Google Business Profile.');
+    } else if (searchParams.get('error') === 'no_gmb_locations_found') {
+      toast.error('No Google Business Profile locations found for this account.');
     }
   }, [searchParams]);
 
@@ -76,6 +82,14 @@ export default function Dashboard() {
       window.location.href = res.data.url;
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to start Tumblr authentication.');
+    }
+  };
+  const handleConnectGoogle = async () => {
+    try {
+      const res = await accountsAPI.googleAuth();
+      window.location.href = res.data.url;
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to start Google authentication.');
     }
   };
   const handleConnectInstagram = () => {
@@ -220,6 +234,13 @@ export default function Dashboard() {
               onClick={handleConnectTumblr}
             >
               + Connect Tumblr
+            </button>
+            <button 
+              className="btn-primary" 
+              style={{ background: '#4285f4' }} 
+              onClick={handleConnectGoogle}
+            >
+              + Connect Google Business
             </button>
           </div>
 

@@ -837,3 +837,74 @@ export const publishToTumblr = async (post, account) => {
   }
 };
 
+export const refreshGoogleToken = async (account) => {
+  try {
+    const response = await axios.post('https://oauth2.googleapis.com/token', {
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      refresh_token: account.refreshToken,
+      grant_type: 'refresh_token',
+    });
+
+    const { access_token, expires_in } = response.data;
+    account.accessToken = access_token;
+    account.tokenExpiresAt = new Date(Date.now() + expires_in * 1000);
+    await account.save();
+
+    return access_token;
+  } catch (error) {
+    console.error('[Google Token Refresh Failed]', error.response?.data || error.message);
+    throw new Error('Failed to refresh Google authorization. Please reconnect your Google account.');
+  }
+};
+
+export const publishToGoogle = async (post, account) => {
+  try {
+    console.log(`[Google] Publishing post ${post._id} to location ${account.platformUserId}`);
+
+    let accessToken = account.accessToken;
+    if (account.tokenExpiresAt && account.tokenExpiresAt < new Date()) {
+      console.log(`[Google] Access token expired, refreshing...`);
+      accessToken = await refreshGoogleToken(account);
+    }
+
+    const mediaItems = [];
+    for (const file of post.media) {
+      const publicUrl = await getPublicUrl(file.url);
+      const isVideo = file.type === 'video' || file.url.toLowerCase().endsWith('.mp4');
+      mediaItems.push({
+        sourceUrl: publicUrl,
+        mediaFormat: isVideo ? 'VIDEO' : 'PHOTO'
+      });
+    }
+
+    const payload = {
+      languageCode: 'en-US',
+      summary: post.content || '',
+      topicType: 'STANDARD'
+    };
+
+    if (mediaItems.length > 0) {
+      payload.media = mediaItems;
+    }
+
+    // Google GMB Post Endpoint
+    const url = `https://mybusiness.googleapis.com/v4/${account.platformUserId}/localPosts`;
+
+    console.log(`[Google] Sending request to ${url} with payload:`, JSON.stringify(payload));
+    const response = await axios.post(url, payload, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    console.log(`[Google] Post published successfully:`, response.data);
+    return response.data;
+  } catch (error) {
+    console.error('[Google Publishing Error]', error.response?.data || error.message);
+    const detail = error.response?.data?.error?.message || error.message;
+    throw new Error(`Google Business Profile API error: ${detail}`);
+  }
+};
+
