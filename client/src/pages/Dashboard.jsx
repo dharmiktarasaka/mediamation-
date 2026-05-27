@@ -43,7 +43,8 @@ export default function Dashboard() {
     } else if (searchParams.get('connected') === 'google') {
       toast.success('Google Business Profile connected successfully!');
     } else if (searchParams.get('error') === 'google_auth_failed') {
-      toast.error('Failed to connect Google Business Profile.');
+      const details = searchParams.get('details');
+      toast.error(details ? `Failed to connect Google Business Profile: ${details}` : 'Failed to connect Google Business Profile.');
     } else if (searchParams.get('error') === 'no_gmb_locations_found') {
       toast.error('No Google Business Profile locations found for this account.');
     }

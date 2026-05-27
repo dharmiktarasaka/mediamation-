@@ -750,8 +750,9 @@ router.get('/google/callback', async (req, res) => {
 
     res.redirect(`${clientUrl}/dashboard?connected=google`);
   } catch (error) {
-    console.error('Google GMB callback error:', error.response?.data || error.message);
-    res.redirect(`${clientUrl}/dashboard?error=google_auth_failed`);
+    const errorDetails = error.response?.data?.error?.message || error.response?.data?.message || error.message;
+    console.error('Google GMB callback error:', errorDetails);
+    res.redirect(`${clientUrl}/dashboard?error=google_auth_failed&details=${encodeURIComponent(errorDetails)}`);
   }
 });
 
