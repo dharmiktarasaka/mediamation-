@@ -625,7 +625,7 @@ const uploadTwitterMediaV2 = async (accessToken, fileBuffer, filename) => {
     }
   );
 
-  const mediaId = initResponse.data.media_id_string || initResponse.data.media_id;
+  const mediaId = initResponse.data.data?.media_id_string || initResponse.data.data?.media_id || initResponse.data.media_id_string || initResponse.data.media_id;
   console.log(`[Twitter V2 Media Upload] Initialized successfully. Media ID: ${mediaId}`);
 
   // Phase 2: Append
@@ -636,15 +636,13 @@ const uploadTwitterMediaV2 = async (accessToken, fileBuffer, filename) => {
     const chunk = fileBuffer.subarray(offset, offset + chunkSize);
     const form = new FormData();
     form.append('media', chunk, { filename });
+    form.append('segment_index', segmentIndex.toString());
 
     console.log(`[Twitter V2 Media Upload] Appending chunk ${segmentIndex} for media ${mediaId}...`);
     await axios.post(
       `https://api.x.com/2/media/upload/${mediaId}/append`,
       form,
       {
-        params: {
-          segment_index: segmentIndex
-        },
         headers: {
           ...form.getHeaders(),
           'Authorization': `Bearer ${accessToken}`
@@ -667,7 +665,7 @@ const uploadTwitterMediaV2 = async (accessToken, fileBuffer, filename) => {
   );
 
   // Poll status if needed (mainly for video/gif)
-  const processingInfo = finalizeResponse.data.processing_info;
+  const processingInfo = finalizeResponse.data.data?.processing_info || finalizeResponse.data.processing_info;
   if (processingInfo && (processingInfo.state === 'pending' || processingInfo.state === 'in_progress')) {
     console.log(`[Twitter V2 Media Upload] Polling processing status for media ${mediaId}...`);
     let checkAttempts = 0;
@@ -685,13 +683,13 @@ const uploadTwitterMediaV2 = async (accessToken, fileBuffer, filename) => {
           }
         }
       );
-      const state = statusResponse.data.processing_info?.state;
+      const state = statusResponse.data.data?.processing_info?.state || statusResponse.data.processing_info?.state;
       console.log(`[Twitter V2 Media Upload] Processing status for ${mediaId}: ${state}`);
       if (state === 'succeeded') {
         break;
       }
       if (state === 'failed') {
-        const errorMsg = statusResponse.data.processing_info?.error?.message || 'Processing failed';
+        const errorMsg = statusResponse.data.data?.processing_info?.error?.message || statusResponse.data.processing_info?.error?.message || 'Processing failed';
         throw new Error(`Twitter media processing failed: ${errorMsg}`);
       }
       checkAttempts++;
