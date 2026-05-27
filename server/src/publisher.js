@@ -625,7 +625,7 @@ const uploadTwitterMediaV2 = async (accessToken, fileBuffer, filename) => {
     }
   );
 
-  const mediaId = initResponse.data.media_id_string;
+  const mediaId = initResponse.data.media_id_string || initResponse.data.media_id;
   console.log(`[Twitter V2 Media Upload] Initialized successfully. Media ID: ${mediaId}`);
 
   // Phase 2: Append
@@ -756,8 +756,19 @@ export const publishToTwitter = async (post, account) => {
     return tweetRes.data?.data;
 
   } catch (error) {
+    if (error.config) {
+      console.error(`[Twitter Error Detail] Request failed: ${error.config.method?.toUpperCase()} ${error.config.url}`);
+      if (error.config.params) console.error(`[Twitter Error Detail] Params:`, error.config.params);
+      if (error.config.data) console.error(`[Twitter Error Detail] Data sent:`, error.config.data);
+    }
     console.error('[Twitter Publishing Error]', error.response?.data || error.message);
-    const detail = error.response?.data?.detail || error.response?.data?.message || error.message;
+    
+    const errors = error.response?.data?.errors;
+    let detail = error.response?.data?.detail || error.response?.data?.message || error.message;
+    if (errors && Array.isArray(errors)) {
+      detail += ' Errors: ' + JSON.stringify(errors);
+    }
+
     if (error.response?.status === 403) {
       throw new Error(`Twitter API error: Publishing media or tweets requires a paid Twitter API plan (Basic or Pro) with 'media.write' and 'tweet.write' scopes enabled, and the app permissions in the X Developer Portal must be set to 'Read and Write'. The Free plan only supports text-only posts (and will error if trying to upload media). Details: ${detail}`);
     }
