@@ -625,7 +625,7 @@ const uploadTwitterMediaV2 = async (accessToken, fileBuffer, filename) => {
     }
   );
 
-  const mediaId = initResponse.data.data?.media_id_string || initResponse.data.data?.media_id || initResponse.data.media_id_string || initResponse.data.media_id;
+  const mediaId = initResponse.data.data?.id || initResponse.data.data?.media_id_string || initResponse.data.data?.media_id || initResponse.data.media_id_string || initResponse.data.media_id || initResponse.data.id;
   console.log(`[Twitter V2 Media Upload] Initialized successfully. Media ID: ${mediaId}`);
 
   // Phase 2: Append
