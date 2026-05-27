@@ -9,7 +9,7 @@ import { buildAuthorizationHeader } from '../utils/oauth1.js';
 
 const router = Router();
 const TWITTER_OAUTH_VERIFIER = 'twitter_oauth_verifier_key_mediamation_static_v2';
-let clientUrl = process.env.CLIENT_URL || 'https://mediamation.vercel.app';
+let clientUrl = (process.env.CLIENT_URL || 'https://mediamation.vercel.app').replace(/[\r\n\s\t]/g, '').trim();
 if (!clientUrl.startsWith('http://') && !clientUrl.startsWith('https://')) {
   clientUrl = 'https://mediamation.vercel.app';
 }
@@ -47,9 +47,9 @@ router.post('/connect-facebook', protect, async (req, res) => {
 
   try {
     const pagesRes = await axios.get('https://graph.facebook.com/v21.0/me/accounts', {
-      params: { 
+      params: {
         fields: 'name,access_token,picture,instagram_business_account',
-        access_token: accessToken 
+        access_token: accessToken
       },
     });
 
@@ -203,9 +203,9 @@ router.post('/connect-instagram-private', protect, async (req, res) => {
       return res.json({ status: 'success', message: 'Instagram account connected successfully', account });
     } catch (loginError) {
       // Check if checkpoint/verification is required
-      const isCheckpoint = 
-        loginError instanceof IgCheckpointError || 
-        loginError.name === 'IgCheckpointError' || 
+      const isCheckpoint =
+        loginError instanceof IgCheckpointError ||
+        loginError.name === 'IgCheckpointError' ||
         (loginError.message && (
           loginError.message.includes('checkpoint') ||
           loginError.message.includes('email to help you') ||
@@ -215,11 +215,11 @@ router.post('/connect-instagram-private', protect, async (req, res) => {
 
       if (isCheckpoint) {
         console.log(`[Instagram Login] Checkpoint required for ${username}. Requesting security code...`);
-        
+
         try {
           // Initiate challenge flow
           await ig.challenge.auto(true);
-          
+
           // Cache the session state
           const state = await serializeState(ig);
           challengeCache.set(username, state);
@@ -286,9 +286,9 @@ router.get('/facebook/callback', async (req, res) => {
     const longLivedToken = longLivedRes.data.access_token;
 
     const pagesRes = await axios.get('https://graph.facebook.com/v21.0/me/accounts', {
-      params: { 
+      params: {
         fields: 'name,access_token,picture,instagram_business_account',
-        access_token: longLivedToken 
+        access_token: longLivedToken
       },
     });
 
@@ -365,7 +365,7 @@ router.get('/pinterest/callback', async (req, res) => {
     const redirectUri = `${protocol}://${host}/api/accounts/pinterest/callback`;
     const pinterestBaseUrl = process.env.PINTEREST_USE_SANDBOX === 'true' ? 'https://api-sandbox.pinterest.com/v5' : 'https://api.pinterest.com/v5';
     // Exchange authorization code for access token
-    const tokenRes = await axios.post(`${pinterestBaseUrl}/oauth/token`, 
+    const tokenRes = await axios.post(`${pinterestBaseUrl}/oauth/token`,
       new URLSearchParams({
         grant_type: 'authorization_code',
         code,
@@ -424,7 +424,7 @@ router.get('/twitter', protect, (req, res) => {
     .createHash('sha256')
     .update(TWITTER_OAUTH_VERIFIER)
     .digest('base64url');
-  
+
   const url = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${process.env.TWITTER_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20tweet.write%20users.read%20offline.access%20media.write&state=${req.user._id}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
   res.json({ url });
 });
@@ -650,8 +650,8 @@ router.get('/tumblr/callback', async (req, res) => {
 
 router.get('/google', protect, (req, res) => {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    return res.status(400).json({ 
-      message: 'Google Client ID or Client Secret is not loaded in the server. Please check your .env file and RESTART your backend server.' 
+    return res.status(400).json({
+      message: 'Google Client ID or Client Secret is not loaded in the server. Please check your .env file and RESTART your backend server.'
     });
   }
 
@@ -718,7 +718,7 @@ router.get('/google/callback', async (req, res) => {
       const locations = locationsRes.data.locations || [];
       for (const loc of locations) {
         // Use full location resource name (e.g. accounts/{accountId}/locations/{locationId}) as platformUserId
-        const platformUserId = loc.name; 
+        const platformUserId = loc.name;
         const name = loc.title || loc.locationName || userName;
 
         const updateData = {

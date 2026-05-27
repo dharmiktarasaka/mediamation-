@@ -6,7 +6,7 @@ import axios from 'axios';
 import Account from '../models/Account.js';
 
 const router = Router();
-let clientUrl = process.env.CLIENT_URL || 'https://mediamation.vercel.app';
+let clientUrl = (process.env.CLIENT_URL || 'https://mediamation.vercel.app').replace(/[\r\n\s\t]/g, '').trim();
 if (!clientUrl.startsWith('http://') && !clientUrl.startsWith('https://')) {
   clientUrl = 'https://mediamation.vercel.app';
 }
