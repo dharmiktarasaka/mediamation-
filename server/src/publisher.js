@@ -592,6 +592,116 @@ async function refreshTwitterToken(account) {
   }
 }
 
+const uploadTwitterMediaV2 = async (accessToken, fileBuffer, filename) => {
+  const ext = path.extname(filename).toLowerCase();
+  let mimeType = 'image/jpeg';
+  let category = 'tweet_image';
+  if (ext === '.mp4') {
+    mimeType = 'video/mp4';
+    category = 'tweet_video';
+  } else if (ext === '.gif') {
+    mimeType = 'image/gif';
+    category = 'tweet_gif';
+  } else if (ext === '.png') {
+    mimeType = 'image/png';
+  }
+
+  const totalBytes = fileBuffer.length;
+  console.log(`[Twitter V2 Media Upload] Initializing upload for ${filename} (${totalBytes} bytes, ${mimeType}, category: ${category})...`);
+
+  // Phase 1: Initialize
+  const initResponse = await axios.post(
+    'https://api.x.com/2/media/upload/initialize',
+    {
+      media_type: mimeType,
+      total_bytes: totalBytes,
+      media_category: category
+    },
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  const mediaId = initResponse.data.media_id_string;
+  console.log(`[Twitter V2 Media Upload] Initialized successfully. Media ID: ${mediaId}`);
+
+  // Phase 2: Append
+  const chunkSize = 1 * 1024 * 1024; // 1MB chunks
+  let segmentIndex = 0;
+
+  for (let offset = 0; offset < totalBytes; offset += chunkSize) {
+    const chunk = fileBuffer.subarray(offset, offset + chunkSize);
+    const form = new FormData();
+    form.append('media', chunk, { filename });
+
+    console.log(`[Twitter V2 Media Upload] Appending chunk ${segmentIndex} for media ${mediaId}...`);
+    await axios.post(
+      `https://api.x.com/2/media/upload/${mediaId}/append`,
+      form,
+      {
+        params: {
+          segment_index: segmentIndex
+        },
+        headers: {
+          ...form.getHeaders(),
+          'Authorization': `Bearer ${accessToken}`
+        }
+      }
+    );
+    segmentIndex++;
+  }
+
+  // Phase 3: Finalize
+  console.log(`[Twitter V2 Media Upload] Finalizing upload for media ${mediaId}...`);
+  const finalizeResponse = await axios.post(
+    `https://api.x.com/2/media/upload/${mediaId}/finalize`,
+    null,
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    }
+  );
+
+  // Poll status if needed (mainly for video/gif)
+  const processingInfo = finalizeResponse.data.processing_info;
+  if (processingInfo && (processingInfo.state === 'pending' || processingInfo.state === 'in_progress')) {
+    console.log(`[Twitter V2 Media Upload] Polling processing status for media ${mediaId}...`);
+    let checkAttempts = 0;
+    while (checkAttempts < 15) {
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      const statusResponse = await axios.get(
+        'https://api.x.com/2/media/upload',
+        {
+          params: {
+            command: 'STATUS',
+            media_id: mediaId
+          },
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+      const state = statusResponse.data.processing_info?.state;
+      console.log(`[Twitter V2 Media Upload] Processing status for ${mediaId}: ${state}`);
+      if (state === 'succeeded') {
+        break;
+      }
+      if (state === 'failed') {
+        const errorMsg = statusResponse.data.processing_info?.error?.message || 'Processing failed';
+        throw new Error(`Twitter media processing failed: ${errorMsg}`);
+      }
+      checkAttempts++;
+    }
+  }
+
+  console.log(`[Twitter V2 Media Upload] Completed upload successfully for media ${mediaId}`);
+  return mediaId;
+};
+
 export const publishToTwitter = async (post, account) => {
   try {
     console.log(`[Twitter] Publishing post ${post._id}`);
@@ -608,34 +718,17 @@ export const publishToTwitter = async (post, account) => {
     for (const file of post.media) {
       const localFile = getLocalFile(file.url);
       if (localFile) {
-        console.log(`[Twitter] Uploading local file: ${localFile.filename} to Twitter...`);
-        const form = new FormData();
-        form.append('media', fs.createReadStream(localFile.path), { filename: localFile.filename });
-        
-        const uploadRes = await axios.post('https://upload.twitter.com/1.1/media/upload.json', form, {
-          headers: {
-            ...form.getHeaders(),
-            'Authorization': `Bearer ${accessToken}`
-          }
-        });
-        if (uploadRes.data && uploadRes.data.media_id_string) {
-          mediaIds.push(uploadRes.data.media_id_string);
-        }
+        console.log(`[Twitter] Reading local file: ${localFile.filename} to upload...`);
+        const fileBuffer = fs.readFileSync(localFile.path);
+        const mediaId = await uploadTwitterMediaV2(accessToken, fileBuffer, localFile.filename);
+        mediaIds.push(mediaId);
       } else {
         console.log(`[Twitter] Fetching remote file for upload: ${file.url}`);
-        const response = await axios.get(file.url, { responseType: 'stream' });
-        const form = new FormData();
-        form.append('media', response.data, { filename: 'upload_image.jpg' });
-
-        const uploadRes = await axios.post('https://upload.twitter.com/1.1/media/upload.json', form, {
-          headers: {
-            ...form.getHeaders(),
-            'Authorization': `Bearer ${accessToken}`
-          }
-        });
-        if (uploadRes.data && uploadRes.data.media_id_string) {
-          mediaIds.push(uploadRes.data.media_id_string);
-        }
+        const response = await axios.get(file.url, { responseType: 'arraybuffer' });
+        const fileBuffer = Buffer.from(response.data);
+        const filename = file.url.split('/').pop() || 'upload_image.jpg';
+        const mediaId = await uploadTwitterMediaV2(accessToken, fileBuffer, filename);
+        mediaIds.push(mediaId);
       }
     }
 
@@ -664,7 +757,11 @@ export const publishToTwitter = async (post, account) => {
 
   } catch (error) {
     console.error('[Twitter Publishing Error]', error.response?.data || error.message);
-    throw new Error(error.response?.data?.detail || error.response?.data?.message || error.message);
+    const detail = error.response?.data?.detail || error.response?.data?.message || error.message;
+    if (error.response?.status === 403) {
+      throw new Error(`Twitter API error: Publishing media or tweets requires a paid Twitter API plan (Basic or Pro) with 'media.write' and 'tweet.write' scopes enabled, and the app permissions in the X Developer Portal must be set to 'Read and Write'. The Free plan only supports text-only posts (and will error if trying to upload media). Details: ${detail}`);
+    }
+    throw new Error(detail);
   }
 };
 
