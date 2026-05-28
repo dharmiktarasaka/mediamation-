@@ -698,27 +698,44 @@ router.get('/google/callback', async (req, res) => {
     const userAvatar = profile.picture || null;
 
     // 3. Fetch Google Business Profile Accounts
-    const accountsRes = await axios.get('https://mybusiness.googleapis.com/v4/accounts', {
-      headers: {
-        'Authorization': `Bearer ${access_token}`
-      }
-    });
-
-    const googleAccounts = accountsRes.data.accounts || [];
-    let locationsConnectedCount = 0;
-
-    // 4. Fetch Locations for each Account and store them in the DB
-    for (const gAccount of googleAccounts) {
-      const locationsRes = await axios.get(`https://mybusiness.googleapis.com/v4/${gAccount.name}/locations`, {
+    let googleAccounts = [];
+    try {
+      const accountsRes = await axios.get('https://mybusinessaccountmanagement.googleapis.com/v1/accounts', {
         headers: {
           'Authorization': `Bearer ${access_token}`
         }
       });
+      googleAccounts = accountsRes.data.accounts || [];
+    } catch (err) {
+      console.error('Failed to fetch accounts from My Business Account Management API:', err.response?.data || err.message);
+      const errMessage = err.response?.data?.error?.message || err.response?.data?.message || err.message;
+      throw new Error(`Failed to fetch GMB accounts. Please ensure "My Business Account Management API" is enabled in your Google Cloud Console. Details: ${errMessage}`);
+    }
 
-      const locations = locationsRes.data.locations || [];
+    let locationsConnectedCount = 0;
+
+    // 4. Fetch Locations for each Account and store them in the DB
+    for (const gAccount of googleAccounts) {
+      let locations = [];
+      try {
+        const locationsRes = await axios.get(`https://mybusinessbusinessinformation.googleapis.com/v1/${gAccount.name}/locations`, {
+          headers: {
+            'Authorization': `Bearer ${access_token}`
+          },
+          params: {
+            readMask: 'name,title'
+          }
+        });
+        locations = locationsRes.data.locations || [];
+      } catch (err) {
+        console.error(`Failed to fetch locations for account ${gAccount.name} from My Business Business Information API:`, err.response?.data || err.message);
+        const errMessage = err.response?.data?.error?.message || err.response?.data?.message || err.message;
+        throw new Error(`Failed to fetch locations. Please ensure "My Business Business Information API" is enabled in your Google Cloud Console. Details: ${errMessage}`);
+      }
+
       for (const loc of locations) {
         // Use full location resource name (e.g. accounts/{accountId}/locations/{locationId}) as platformUserId
-        const platformUserId = loc.name;
+        const platformUserId = `${gAccount.name}/${loc.name}`;
         const name = loc.title || loc.locationName || userName;
 
         const updateData = {
