@@ -708,8 +708,8 @@ router.get('/google/callback', async (req, res) => {
       googleAccounts = accountsRes.data.accounts || [];
     } catch (err) {
       console.error('Failed to fetch accounts from My Business Account Management API:', err.response?.data || err.message);
-      const errMessage = err.response?.data?.error?.message || err.response?.data?.message || err.message;
-      throw new Error(`Failed to fetch GMB accounts. Please ensure "My Business Account Management API" is enabled in your Google Cloud Console. Details: ${errMessage}`);
+      const googleError = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+      throw new Error(`Failed to fetch GMB accounts. Please ensure "My Business Account Management API" is enabled in your Google Cloud Console. Google API error: ${googleError}`);
     }
 
     let locationsConnectedCount = 0;
@@ -729,8 +729,8 @@ router.get('/google/callback', async (req, res) => {
         locations = locationsRes.data.locations || [];
       } catch (err) {
         console.error(`Failed to fetch locations for account ${gAccount.name} from My Business Business Information API:`, err.response?.data || err.message);
-        const errMessage = err.response?.data?.error?.message || err.response?.data?.message || err.message;
-        throw new Error(`Failed to fetch locations. Please ensure "My Business Business Information API" is enabled in your Google Cloud Console. Details: ${errMessage}`);
+        const googleError = err.response?.data ? JSON.stringify(err.response.data) : err.message;
+        throw new Error(`Failed to fetch locations. Please ensure "My Business Business Information API" is enabled in your Google Cloud Console. Google API error: ${googleError}`);
       }
 
       for (const loc of locations) {
