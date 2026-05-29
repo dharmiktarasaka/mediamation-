@@ -11,33 +11,60 @@ export default function Schedule() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState('');
   const [generatingCaption, setGeneratingCaption] = useState(false);
+  const [generatingCaptionFor, setGeneratingCaptionFor] = useState(null); // 'global' or accountId
   const [tone, setTone] = useState('attractive');
   const [selectedAccountIds, setSelectedAccountIds] = useState([]);
+  const [customizeCaptions, setCustomizeCaptions] = useState(false);
+  const [individualCaptions, setIndividualCaptions] = useState({});
+  const [individualTones, setIndividualTones] = useState({});
   const [form, setForm] = useState({
     content: '',
     scheduledAt: '',
     media: [],
   });
 
-  const handleGenerateCaption = async () => {
+  const handleGenerateCaption = async (targetAccountId = null) => {
     const imageFile = media.find(file => file.mimetype.startsWith('image/'));
     if (!imageFile) {
       toast.error('Please upload at least one image to generate a caption.');
       return;
     }
 
+    const currentTone = targetAccountId ? (individualTones[targetAccountId] || 'attractive') : tone;
+
     setGeneratingCaption(true);
+    setGeneratingCaptionFor(targetAccountId || 'global');
     try {
       const res = await uploadAPI.generateCaption({
         filename: imageFile.filename,
         mimetype: imageFile.mimetype,
-        tone: tone,
+        tone: currentTone,
         url: imageFile.url,
       });
-      setForm(prev => ({
-        ...prev,
-        content: res.data.caption
-      }));
+
+      if (targetAccountId) {
+        setIndividualCaptions(prev => ({
+          ...prev,
+          [targetAccountId]: res.data.caption
+        }));
+      } else {
+        const oldContent = form.content;
+        setForm(prev => ({
+          ...prev,
+          content: res.data.caption
+        }));
+        // Update all individual captions that are in sync with global content
+        setIndividualCaptions(prev => {
+          const updated = { ...prev };
+          selectedAccountIds.forEach(id => {
+            if (updated[id] === undefined || updated[id] === oldContent || updated[id] === '') {
+              updated[id] = res.data.caption;
+            }
+          });
+          return updated;
+        });
+      }
+
       if (res.data.isMock) {
         if (res.data.reason === 'api_error') {
           const isQuota = res.data.error?.toLowerCase().includes('quota') || res.data.error?.includes('429');
@@ -64,6 +91,7 @@ export default function Schedule() {
       toast.error(err.response?.data?.message || 'Failed to generate AI caption. Make sure GEMINI_API_KEY is configured in your server/.env');
     } finally {
       setGeneratingCaption(false);
+      setGeneratingCaptionFor(null);
     }
   };
 
@@ -155,20 +183,27 @@ export default function Schedule() {
       
       // Schedule post for each selected account
       await Promise.all(
-        selectedAccountIds.map(accId => 
-          postsAPI.create({
+        selectedAccountIds.map(accId => {
+          const finalContent = customizeCaptions 
+            ? (individualCaptions[accId] !== undefined ? individualCaptions[accId] : form.content)
+            : form.content;
+
+          return postsAPI.create({
             accountId: accId,
-            content: form.content,
+            content: finalContent,
             scheduledAt: utcScheduledAt,
             media: transformedMedia
-          })
-        )
+          });
+        })
       );
       
       toast.success(`Post scheduled successfully for ${selectedAccountIds.length} account(s)!`);
       setForm({ content: '', scheduledAt: '', media: [] });
       setSelectedAccountIds([]);
       setMedia([]);
+      setCustomizeCaptions(false);
+      setIndividualCaptions({});
+      setIndividualTones({});
       loadData();
     } catch (err) {
       console.error(err);
@@ -202,14 +237,34 @@ export default function Schedule() {
                 <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
                   <button 
                     type="button" 
-                    onClick={() => setSelectedAccountIds(accounts.map(a => a._id))}
+                    onClick={() => {
+                      const allIds = accounts.map(a => a._id);
+                      setSelectedAccountIds(allIds);
+                      // Pre-fill captions and tones for new selections
+                      setIndividualCaptions(prev => {
+                        const updated = { ...prev };
+                        allIds.forEach(id => {
+                          if (updated[id] === undefined) updated[id] = form.content;
+                        });
+                        return updated;
+                      });
+                      setIndividualTones(prev => {
+                        const updated = { ...prev };
+                        allIds.forEach(id => {
+                          if (updated[id] === undefined) updated[id] = tone;
+                        });
+                        return updated;
+                      });
+                    }}
                     className="btn-clear-selection"
                   >
                     Select All
                   </button>
                   <button 
                     type="button" 
-                    onClick={() => setSelectedAccountIds([])}
+                    onClick={() => {
+                      setSelectedAccountIds([]);
+                    }}
                     className="btn-clear-selection"
                   >
                     Clear All
@@ -226,6 +281,19 @@ export default function Schedule() {
                             setSelectedAccountIds(selectedAccountIds.filter(id => id !== acc._id));
                           } else {
                             setSelectedAccountIds([...selectedAccountIds, acc._id]);
+                            // Pre-fill caption & tone for this account if they don't exist yet
+                            if (individualCaptions[acc._id] === undefined) {
+                              setIndividualCaptions(prev => ({
+                                ...prev,
+                                [acc._id]: form.content
+                              }));
+                            }
+                            if (individualTones[acc._id] === undefined) {
+                              setIndividualTones(prev => ({
+                                ...prev,
+                                [acc._id]: tone
+                              }));
+                            }
                           }
                         }}
                         className={`platform-select-card ${isSelected ? 'selected' : ''}`}
@@ -317,48 +385,181 @@ export default function Schedule() {
             )}
           </div>
 
-          <div className="textarea-header">
-            <label>Post Content</label>
-            {media.some(file => file.mimetype.startsWith('image/')) && (
-              <div className="ai-controls-wrapper">
-                <select
-                  value={tone}
-                  onChange={(e) => setTone(e.target.value)}
-                  className="select-ai-tone"
-                  disabled={generatingCaption}
-                  title="Choose AI Tone"
-                >
-                  <option value="attractive">Attractive ✨</option>
-                  <option value="professional">Professional 📈</option>
-                  <option value="funny">Funny 😂</option>
-                  <option value="personal">Personal 💬</option>
-                  <option value="joy">Joy ☀️</option>
-                  <option value="advertisement">Advertisement 📢</option>
-                  <option value="marketing">Marketing 🎯</option>
-                </select>
-                <button
-                  type="button"
-                  className="btn-ai-generate"
-                  onClick={handleGenerateCaption}
-                  disabled={generatingCaption}
-                  title="Generate AI Caption"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="ai-icon">
-                    <path fillRule="evenodd" d="M9 4.5a.75.75 0 0 1 .721.544l.813 2.846a3.75 3.75 0 0 0 2.576 2.576l2.845.813a.75.75 0 0 1 0 1.442l-2.845.813a3.75 3.75 0 0 0-2.576 2.576l-.813 2.846a.75.75 0 0 1-1.442 0l-.813-2.846a3.75 3.75 0 0 0-2.576-2.576l-2.845-.813a.75.75 0 0 1 0-1.442l2.845-.813A3.75 3.75 0 0 0 7.466 7.89l.813-2.846A.75.75 0 0 1 9 4.5ZM18 1.5a.75.75 0 0 1 .728.568l.258.903a1.5 1.5 0 0 0 1.05 1.05l.903.258a.75.75 0 0 1 0 1.448l-.903.258a1.5 1.5 0 0 0-1.05 1.05l-.258.903a.75.75 0 0 1-1.448 0l-.258-.903a1.5 1.5 0 0 0-1.05-1.05l-.903-.258a.75.75 0 0 1 0-1.448l.903-.258a1.5 1.5 0 0 0 1.05-1.05l.258-.903A.75.75 0 0 1 18 1.5ZM11.25 21a.75.75 0 0 1 .728.568l.258.903a1.5 1.5 0 0 0 1.05 1.05l.903.258a.75.75 0 0 1 0 1.448l-.903.258a1.5 1.5 0 0 0-1.05 1.05l-.258.903a.75.75 0 0 1-1.448 0l-.258-.903a1.5 1.5 0 0 0-1.05-1.05l-.903-.258a.75.75 0 0 1 0-1.448l.903-.258a1.5 1.5 0 0 0 1.05-1.05l.258-.903A.75.75 0 0 1 11.25 21Z" clipRule="evenodd" />
-                  </svg>
-                  {generatingCaption ? 'Generating...' : 'AI Write'}
-                </button>
-              </div>
-            )}
-          </div>
+          {selectedAccountIds.length > 1 && (
+            <div className="customize-captions-toggle" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', background: 'rgba(255, 255, 255, 0.02)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)' }}>
+              <input
+                type="checkbox"
+                id="customizeCaptions"
+                checked={customizeCaptions}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  setCustomizeCaptions(checked);
+                  if (checked) {
+                    // Populate individual captions and tones with default values if they aren't set
+                    setIndividualCaptions(prev => {
+                      const updated = { ...prev };
+                      selectedAccountIds.forEach(id => {
+                        if (updated[id] === undefined || updated[id] === '') {
+                          updated[id] = form.content;
+                        }
+                      });
+                      return updated;
+                    });
+                    setIndividualTones(prev => {
+                      const updated = { ...prev };
+                      selectedAccountIds.forEach(id => {
+                        if (updated[id] === undefined) {
+                          updated[id] = tone;
+                        }
+                      });
+                      return updated;
+                    });
+                  }
+                }}
+                style={{ width: 'auto', cursor: 'pointer', margin: 0 }}
+              />
+              <label htmlFor="customizeCaptions" style={{ cursor: 'pointer', fontWeight: '600', fontSize: '13px', color: 'var(--text)' }}>
+                Customize captions for each selected account
+              </label>
+            </div>
+          )}
 
-          <textarea
-            placeholder="Post content"
-            value={form.content}
-            onChange={(e) => setForm({ ...form, content: e.target.value })}
-            rows={4}
-            required
-          />
+          {customizeCaptions && selectedAccountIds.length > 1 ? (
+            <div className="individual-captions-container" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '10px' }}>
+              <label style={{ fontWeight: '700', fontSize: '14px', color: 'var(--primary)' }}>Custom Captions per Account</label>
+              {selectedAccountIds.map(accId => {
+                const acc = accounts.find(a => a._id === accId);
+                if (!acc) return null;
+                const isGeneratingThis = generatingCaption && generatingCaptionFor === accId;
+                
+                return (
+                  <div key={accId} className="individual-caption-card" style={{
+                    background: 'rgba(30, 33, 54, 0.3)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '12px',
+                    padding: '14px 16px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span className={`platform-badge ${acc.platform}`} style={{ fontSize: '9px', padding: '2px 6px' }}>{acc.platform}</span>
+                        <span style={{ fontWeight: '600', fontSize: '13px', color: 'var(--text)' }}>{acc.name}</span>
+                      </div>
+                      
+                      {media.some(file => file.mimetype.startsWith('image/')) && (
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <select
+                            value={individualTones[accId] || 'attractive'}
+                            onChange={(e) => setIndividualTones({
+                              ...individualTones,
+                              [accId]: e.target.value
+                            })}
+                            className="select-ai-tone"
+                            disabled={generatingCaption}
+                            style={{ padding: '4px 24px 4px 8px', fontSize: '11px', height: '28px', width: 'auto', backgroundPosition: 'right 8px center' }}
+                          >
+                            <option value="attractive">Attractive ✨</option>
+                            <option value="professional">Professional 📈</option>
+                            <option value="funny">Funny 😂</option>
+                            <option value="personal">Personal 💬</option>
+                            <option value="joy">Joy ☀️</option>
+                            <option value="advertisement">Advertisement 📢</option>
+                            <option value="marketing">Marketing 🎯</option>
+                          </select>
+                          <button
+                            type="button"
+                            className="btn-ai-generate"
+                            onClick={() => handleGenerateCaption(accId)}
+                            disabled={generatingCaption}
+                            style={{ padding: '4px 10px', fontSize: '11px', height: '28px' }}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="ai-icon" style={{ width: '10px', height: '10px', marginRight: '2px' }}>
+                              <path fillRule="evenodd" d="M9 4.5a.75.75 0 0 1 .721.544l.813 2.846a3.75 3.75 0 0 0 2.576 2.576l2.845.813a.75.75 0 0 1 0 1.442l-2.845.813a3.75 3.75 0 0 0-2.576 2.576l-.813 2.846a.75.75 0 0 1-1.442 0l-.813-2.846a3.75 3.75 0 0 0-2.576-2.576l-2.845-.813a.75.75 0 0 1 0-1.442l2.845-.813A3.75 3.75 0 0 0 7.466 7.89l.813-2.846A.75.75 0 0 1 9 4.5ZM18 1.5a.75.75 0 0 1 .728.568l.258.903a1.5 1.5 0 0 0 1.05 1.05l.903.258a.75.75 0 0 1 0 1.448l-.903.258a1.5 1.5 0 0 0-1.05 1.05l-.258.903a.75.75 0 0 1-1.448 0l-.258-.903a1.5 1.5 0 0 0-1.05-1.05l-.903-.258a.75.75 0 0 1 0-1.448l.903-.258a1.5 1.5 0 0 0 1.05-1.05l.258-.903A.75.75 0 0 1 18 1.5ZM11.25 21a.75.75 0 0 1 .728.568l.258.903a1.5 1.5 0 0 0 1.05 1.05l.903.258a.75.75 0 0 1 0 1.448l-.903.258a1.5 1.5 0 0 0-1.05 1.05l-.258.903a.75.75 0 0 1-1.448 0l-.258-.903a1.5 1.5 0 0 0-1.05-1.05l-.903-.258a.75.75 0 0 1 0-1.448l.903-.258a1.5 1.5 0 0 0 1.05-1.05l.258-.903A.75.75 0 0 1 11.25 21Z" clipRule="evenodd" />
+                            </svg>
+                            {isGeneratingThis ? 'Writing...' : 'AI Write'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <textarea
+                      placeholder={`Caption for ${acc.name}...`}
+                      value={individualCaptions[accId] || ''}
+                      onChange={(e) => setIndividualCaptions({
+                        ...individualCaptions,
+                        [accId]: e.target.value
+                      })}
+                      rows={3}
+                      required
+                      style={{ minHeight: '80px', fontSize: '13px' }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <>
+              <div className="textarea-header">
+                <label>Post Content</label>
+                {media.some(file => file.mimetype.startsWith('image/')) && (
+                  <div className="ai-controls-wrapper">
+                    <select
+                      value={tone}
+                      onChange={(e) => setTone(e.target.value)}
+                      className="select-ai-tone"
+                      disabled={generatingCaption}
+                      title="Choose AI Tone"
+                    >
+                      <option value="attractive">Attractive ✨</option>
+                      <option value="professional">Professional 📈</option>
+                      <option value="funny">Funny 😂</option>
+                      <option value="personal">Personal 💬</option>
+                      <option value="joy">Joy ☀️</option>
+                      <option value="advertisement">Advertisement 📢</option>
+                      <option value="marketing">Marketing 🎯</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="btn-ai-generate"
+                      onClick={() => handleGenerateCaption()}
+                      disabled={generatingCaption}
+                      title="Generate AI Caption"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="ai-icon">
+                        <path fillRule="evenodd" d="M9 4.5a.75.75 0 0 1 .721.544l.813 2.846a3.75 3.75 0 0 0 2.576 2.576l2.845.813a.75.75 0 0 1 0 1.442l-2.845.813a3.75 3.75 0 0 0-2.576 2.576l-.813 2.846a.75.75 0 0 1-1.442 0l-.813-2.846a3.75 3.75 0 0 0-2.576-2.576l-2.845-.813a.75.75 0 0 1 0-1.442l2.845-.813A3.75 3.75 0 0 0 7.466 7.89l.813-2.846A.75.75 0 0 1 9 4.5ZM18 1.5a.75.75 0 0 1 .728.568l.258.903a1.5 1.5 0 0 0 1.05 1.05l.903.258a.75.75 0 0 1 0 1.448l-.903.258a1.5 1.5 0 0 0-1.05 1.05l-.258.903a.75.75 0 0 1-1.448 0l-.258-.903a1.5 1.5 0 0 0-1.05-1.05l-.903-.258a.75.75 0 0 1 0-1.448l.903-.258a1.5 1.5 0 0 0 1.05-1.05l.258-.903A.75.75 0 0 1 18 1.5ZM11.25 21a.75.75 0 0 1 .728.568l.258.903a1.5 1.5 0 0 0 1.05 1.05l.903.258a.75.75 0 0 1 0 1.448l-.903.258a1.5 1.5 0 0 0-1.05 1.05l-.258.903a.75.75 0 0 1-1.448 0l-.258-.903a1.5 1.5 0 0 0-1.05-1.05l-.903-.258a.75.75 0 0 1 0-1.448l.903-.258a1.5 1.5 0 0 0 1.05-1.05l.258-.903A.75.75 0 0 1 11.25 21Z" clipRule="evenodd" />
+                      </svg>
+                      {generatingCaption && generatingCaptionFor === 'global' ? 'Generating...' : 'AI Write'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <textarea
+                placeholder="Post content"
+                value={form.content}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setForm({ ...form, content: val });
+                  // Also update any individual captions that have not been customized yet
+                  setIndividualCaptions(prev => {
+                    const updated = { ...prev };
+                    selectedAccountIds.forEach(id => {
+                      // If the caption for this account is identical to the old global caption or hasn't been set,
+                      // we keep it in sync with the global input.
+                      if (updated[id] === undefined || updated[id] === form.content) {
+                        updated[id] = val;
+                      }
+                    });
+                    return updated;
+                  });
+                }}
+                rows={4}
+                required
+              />
+            </>
+          )}
           <input
             type="datetime-local"
             value={form.scheduledAt}

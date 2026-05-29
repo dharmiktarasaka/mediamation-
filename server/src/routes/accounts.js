@@ -2,6 +2,7 @@ import { Router } from 'express';
 import axios from 'axios';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
+import jwt from 'jsonwebtoken';
 import { protect } from '../middleware/auth.js';
 import Account from '../models/Account.js';
 import { IgApiClient, IgCheckpointError } from 'instagram-private-api';
@@ -255,12 +256,22 @@ router.post('/connect-instagram-private', protect, async (req, res) => {
 });
 
 router.get('/facebook', protect, (req, res) => {
-  const url = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${process.env.FACEBOOK_REDIRECT_URI}&state=${req.user._id}&scope=pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish,pages_show_list,business_management`;
+  const stateToken = jwt.sign({ userId: req.user._id.toString() }, process.env.JWT_SECRET, { expiresIn: '15m' });
+  const url = `https://www.facebook.com/v21.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${process.env.FACEBOOK_REDIRECT_URI}&state=${stateToken}&scope=pages_manage_posts,pages_read_engagement,instagram_basic,instagram_content_publish,pages_show_list,business_management`;
   res.json({ url });
 });
 
 router.get('/facebook/callback', async (req, res) => {
   const { code, state } = req.query;
+  let userId;
+  try {
+    const decoded = jwt.verify(state, process.env.JWT_SECRET);
+    userId = decoded.userId;
+  } catch (err) {
+    console.error('Facebook state verification failed:', err.message);
+    return res.redirect(`${clientUrl}/dashboard?error=facebook_auth_failed&details=Invalid%20state%20parameter`);
+  }
+
   try {
     const tokenRes = await axios.get('https://graph.facebook.com/v21.0/oauth/access_token', {
       params: {
@@ -300,7 +311,7 @@ router.get('/facebook/callback', async (req, res) => {
       await Account.findOneAndUpdate(
         { platformUserId: page.id, platform: 'facebook' },
         {
-          user: state,
+          user: userId,
           platform: 'facebook',
           platformUserId: page.id,
           name: page.name,
@@ -315,7 +326,7 @@ router.get('/facebook/callback', async (req, res) => {
         await Account.findOneAndUpdate(
           { platformUserId: page.instagram_business_account.id, platform: 'instagram' },
           {
-            user: state,
+            user: userId,
             platform: 'instagram',
             platformUserId: page.instagram_business_account.id,
             name: `${page.name} (Instagram)`,
@@ -344,7 +355,8 @@ router.get('/instagram', protect, (req, res) => {
   const host = req.get('host');
   const redirectUri = `${protocol}://${host}/api/auth/instagram/callback`;
 
-  const url = `https://api.instagram.com/oauth/authorize?client_id=${process.env.INSTAGRAM_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=instagram_business_basic,instagram_business_content_publish&response_type=code&state=${req.user._id}`;
+  const stateToken = jwt.sign({ userId: req.user._id.toString() }, process.env.JWT_SECRET, { expiresIn: '15m' });
+  const url = `https://api.instagram.com/oauth/authorize?client_id=${process.env.INSTAGRAM_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=instagram_business_basic,instagram_business_content_publish&response_type=code&state=${stateToken}`;
   res.json({ url });
 });
 
@@ -353,12 +365,22 @@ router.get('/pinterest', protect, (req, res) => {
   const host = req.get('host');
   const redirectUri = `${protocol}://${host}/api/accounts/pinterest/callback`;
 
-  const url = `https://www.pinterest.com/oauth/?client_id=${process.env.PINTEREST_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=boards:read,boards:write,pins:read,pins:write,user_accounts:read&state=${req.user._id}`;
+  const stateToken = jwt.sign({ userId: req.user._id.toString() }, process.env.JWT_SECRET, { expiresIn: '15m' });
+  const url = `https://www.pinterest.com/oauth/?client_id=${process.env.PINTEREST_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=boards:read,boards:write,pins:read,pins:write,user_accounts:read&state=${stateToken}`;
   res.json({ url });
 });
 
 router.get('/pinterest/callback', async (req, res) => {
   const { code, state } = req.query;
+  let userId;
+  try {
+    const decoded = jwt.verify(state, process.env.JWT_SECRET);
+    userId = decoded.userId;
+  } catch (err) {
+    console.error('Pinterest state verification failed:', err.message);
+    return res.redirect(`${clientUrl}/dashboard?error=pinterest_auth_failed&details=Invalid%20state%20parameter`);
+  }
+
   try {
     const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
     const host = req.get('host');
@@ -396,7 +418,7 @@ router.get('/pinterest/callback', async (req, res) => {
     await Account.findOneAndUpdate(
       { platformUserId, platform: 'pinterest' },
       {
-        user: state,
+        user: userId,
         platform: 'pinterest',
         platformUserId,
         name: `@${name}`,
@@ -425,12 +447,22 @@ router.get('/twitter', protect, (req, res) => {
     .update(TWITTER_OAUTH_VERIFIER)
     .digest('base64url');
 
-  const url = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${process.env.TWITTER_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20tweet.write%20users.read%20offline.access%20media.write&state=${req.user._id}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+  const stateToken = jwt.sign({ userId: req.user._id.toString() }, process.env.JWT_SECRET, { expiresIn: '15m' });
+  const url = `https://twitter.com/i/oauth2/authorize?response_type=code&client_id=${process.env.TWITTER_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=tweet.read%20tweet.write%20users.read%20offline.access%20media.write&state=${stateToken}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
   res.json({ url });
 });
 
 router.get('/twitter/callback', async (req, res) => {
   const { code, state } = req.query;
+  let userId;
+  try {
+    const decoded = jwt.verify(state, process.env.JWT_SECRET);
+    userId = decoded.userId;
+  } catch (err) {
+    console.error('Twitter state verification failed:', err.message);
+    return res.redirect(`${clientUrl}/dashboard?error=twitter_auth_failed&details=Invalid%20state%20parameter`);
+  }
+
   try {
     const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
     const host = req.get('host');
@@ -472,7 +504,7 @@ router.get('/twitter/callback', async (req, res) => {
     await Account.findOneAndUpdate(
       { platformUserId, platform: 'twitter' },
       {
-        user: state,
+        user: userId,
         platform: 'twitter',
         platformUserId,
         name: `@${name}`,
@@ -665,12 +697,22 @@ router.get('/google', protect, (req, res) => {
     'email'
   ];
 
-  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID.trim()}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}&state=${req.user._id}&access_type=offline&prompt=consent`;
+  const stateToken = jwt.sign({ userId: req.user._id.toString() }, process.env.JWT_SECRET, { expiresIn: '15m' });
+  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID.trim()}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scopes.join(' '))}&state=${stateToken}&access_type=offline&prompt=consent`;
   res.json({ url });
 });
 
 router.get('/google/callback', async (req, res) => {
   const { code, state } = req.query;
+  let userId;
+  try {
+    const decoded = jwt.verify(state, process.env.JWT_SECRET);
+    userId = decoded.userId;
+  } catch (err) {
+    console.error('Google state verification failed:', err.message);
+    return res.redirect(`${clientUrl}/dashboard?error=google_auth_failed&details=Invalid%20state%20parameter`);
+  }
+
   try {
     const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
     const host = req.get('host');
@@ -739,7 +781,7 @@ router.get('/google/callback', async (req, res) => {
         const name = loc.title || loc.locationName || userName;
 
         const updateData = {
-          user: state,
+          user: userId,
           platform: 'google',
           platformUserId,
           name: `${name} (Google)`,

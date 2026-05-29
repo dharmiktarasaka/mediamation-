@@ -4,6 +4,7 @@ import User from '../models/User.js';
 import { generateToken, protect } from '../middleware/auth.js';
 import axios from 'axios';
 import Account from '../models/Account.js';
+import jwt from 'jsonwebtoken';
 
 const router = Router();
 let clientUrl = (process.env.CLIENT_URL || 'https://mediamation.vercel.app').replace(/[\r\n\s\t]/g, '').trim();
@@ -87,6 +88,15 @@ router.get('/instagram/callback', async (req, res) => {
     return res.redirect(`${clientUrl}/dashboard?error=instagram_auth_failed`);
   }
 
+  let userId;
+  try {
+    const decoded = jwt.verify(state, process.env.JWT_SECRET);
+    userId = decoded.userId;
+  } catch (err) {
+    console.error('Instagram state verification failed:', err.message);
+    return res.redirect(`${clientUrl}/dashboard?error=instagram_auth_failed&details=Invalid%20state%20parameter`);
+  }
+
   try {
     const protocol = req.secure || req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
     const host = req.get('host');
@@ -135,7 +145,7 @@ router.get('/instagram/callback', async (req, res) => {
     await Account.findOneAndUpdate(
       { platformUserId: id, platform: 'instagram' },
       {
-        user: state,
+        user: userId,
         platform: 'instagram',
         platformUserId: id,
         name: username,

@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { encrypt, decrypt } from '../utils/crypto.js';
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -12,10 +13,42 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
+  // Encrypt password if modified
+  if (this.isModified('password') && this.password) {
+    this.password = await bcrypt.hash(this.password, 12);
+  }
+  
+  // Encrypt AI API keys
+  if (this.groqApiKey) this.groqApiKey = encrypt(this.groqApiKey);
+  if (this.geminiApiKey) this.geminiApiKey = encrypt(this.geminiApiKey);
+  
   next();
 });
+
+userSchema.pre('findOneAndUpdate', function (next) {
+  const update = this.getUpdate();
+  if (update) {
+    if (update.groqApiKey) update.groqApiKey = encrypt(update.groqApiKey);
+    if (update.geminiApiKey) update.geminiApiKey = encrypt(update.geminiApiKey);
+
+    if (update.$set) {
+      if (update.$set.groqApiKey) update.$set.groqApiKey = encrypt(update.$set.groqApiKey);
+      if (update.$set.geminiApiKey) update.$set.geminiApiKey = encrypt(update.$set.geminiApiKey);
+    }
+  }
+  next();
+});
+
+function decryptUser(doc) {
+  if (doc) {
+    if (doc.groqApiKey) doc.groqApiKey = decrypt(doc.groqApiKey);
+    if (doc.geminiApiKey) doc.geminiApiKey = decrypt(doc.geminiApiKey);
+  }
+}
+
+userSchema.post('init', decryptUser);
+userSchema.post('save', decryptUser);
+userSchema.post('findOneAndUpdate', decryptUser);
 
 userSchema.methods.comparePassword = async function (candidate) {
   return bcrypt.compare(candidate, this.password);
@@ -28,3 +61,4 @@ userSchema.methods.toJSON = function () {
 };
 
 export default mongoose.model('User', userSchema);
+
